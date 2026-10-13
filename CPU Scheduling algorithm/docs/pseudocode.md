@@ -1,67 +1,27 @@
-# Mã giả 5 thuật toán
+# Mô tả ngắn 5 thuật toán lập lịch
 
-Các thuật toán chọn tiến trình trong hàng đợi sẵn sàng; quy tắc xử lý khi các tiến trình ngang nhau và cách xử lý thời điểm được định nghĩa tại `scheduling-rules.md`.
+## Quy ước chung
+
+Khởi tạo `remainingTime = burstTime`; `startTime` và `completionTime` chưa có. Mô phỏng bắt đầu tại 0. Khi không có tiến trình sẵn sàng, CPU idle đến arrival kế tiếp và ghi khoảng `IDLE` vào execution trace. Ghi riêng từng khoảng chạy `[start, end)`; lần chạy đầu xác định `startTime`, còn `completionTime` được ghi khi `remainingTime = 0`. Mỗi lượt chạy cập nhật thời gian hiện tại và trừ thời lượng chạy khỏi `remainingTime`.
+
+Đầu vào: `processId` duy nhất, `arrivalTime >= 0`, `burstTime > 0`; `quantum > 0` cho Round Robin. Thời gian là số nguyên; priority nhỏ hơn nghĩa là ưu tiên cao hơn.
 
 ## FCFS (không ngắt)
 
-```text
-sắp xếp tiến trình theo thời điểm đến tăng dần, sau đó theo mã tiến trình
-cho mỗi tiến trình theo thứ tự đã sắp xếp:
-    nếu CPU đang rỗi, chuyển thời gian đến lúc tiến trình đến và ghi nhận khoảng rỗi
-    chạy tiến trình đến khi thời gian CPU còn lại bằng 0
-    ghi nhận quá trình thực thi và thời điểm hoàn tất
-```
+Chạy lần lượt theo arrival tăng dần, hòa theo `processId` tăng dần. Nếu CPU rỗi, ghi idle đến arrival kế tiếp. Mỗi tiến trình chạy liên tục đến hoàn tất; ghi start, completion và trace.
 
 ## SJF (không ngắt)
 
-```text
-lặp khi vẫn còn tiến trình chưa hoàn tất:
-    thêm các tiến trình đã đến vào hàng đợi sẵn sàng
-    nếu hàng đợi sẵn sàng trống: chuyển thời gian đến lúc tiến trình tiếp theo đến và ghi nhận CPU rỗi
-    ngược lại:
-        chọn tiến trình có thời gian CPU cần chạy ngắn nhất
-        nếu bằng nhau, chọn tiến trình đến sớm hơn, sau đó chọn theo mã tiến trình
-        chạy tiến trình đến khi hoàn tất
-        ghi nhận quá trình thực thi và thời điểm hoàn tất
-```
+Chọn trong số tiến trình đã đến tiến trình có `burstTime` nhỏ nhất; hòa theo arrival sớm hơn rồi `processId` tăng dần. Nếu chưa có tiến trình sẵn sàng, ghi idle đến arrival kế tiếp. Tiến trình được chọn chạy đến hoàn tất rồi mới chọn lại.
+
+## Priority (không ngắt)
+
+Chọn tiến trình đã đến có priority nhỏ nhất; hòa theo arrival sớm hơn rồi `processId` tăng dần. Nếu chưa có tiến trình sẵn sàng, ghi idle đến arrival kế tiếp. Tiến trình chạy đến hoàn tất, không bị ngắt; không dùng aging.
 
 ## SRTF (có ngắt)
 
-```text
-lặp khi vẫn còn tiến trình chưa hoàn tất:
-    thêm các tiến trình mới đến vào hàng đợi sẵn sàng
-    nếu hàng đợi sẵn sàng trống: chuyển thời gian đến lúc tiến trình tiếp theo đến và ghi nhận CPU rỗi
-    ngược lại:
-        chọn tiến trình có thời gian CPU còn lại ngắn nhất
-        chạy tiến trình đến khi hoàn tất hoặc có tiến trình mới đến
-        ghi nhận quá trình thực thi và cập nhật thời gian CPU còn lại
-        chọn lại tiến trình mỗi khi có tiến trình mới đến
-```
-
-## Ưu tiên (Priority, không ngắt)
-
-```text
-lặp khi vẫn còn tiến trình chưa hoàn tất:
-    thêm các tiến trình đã đến vào hàng đợi sẵn sàng
-    nếu hàng đợi sẵn sàng trống: chuyển thời gian đến lúc tiến trình tiếp theo đến và ghi nhận CPU rỗi
-    ngược lại:
-        chọn tiến trình có số độ ưu tiên nhỏ nhất
-        nếu bằng nhau, chọn tiến trình đến sớm hơn, sau đó chọn theo mã tiến trình
-        chạy tiến trình đến khi hoàn tất
-        ghi nhận quá trình thực thi và thời điểm hoàn tất
-```
+Chọn tiến trình đã đến có `remainingTime` nhỏ nhất. Nếu tiến trình đang chạy vẫn tối ưu, kể cả khi hòa, tiếp tục chạy; nếu không, hòa theo arrival sớm hơn rồi `processId` tăng dần. Chạy đến khi hoàn tất hoặc có tiến trình mới đến, ghi trace và cập nhật thời gian còn lại; sau mỗi arrival hoặc completion, chọn lại. CPU idle đến arrival kế tiếp nếu không có tiến trình sẵn sàng.
 
 ## Round Robin (có ngắt)
 
-```text
-sắp xếp tiến trình theo thời điểm đến tăng dần, sau đó theo mã tiến trình
-lặp khi vẫn còn tiến trình chưa hoàn tất:
-    đưa vào hàng đợi các tiến trình đã đến tính đến thời điểm hiện tại
-    nếu hàng đợi sẵn sàng trống: chuyển thời gian đến lúc tiến trình tiếp theo đến và ghi nhận CPU rỗi
-    ngược lại:
-        lấy tiến trình ở đầu hàng đợi
-        chạy trong khoảng thời gian nhỏ hơn giữa lát thời gian và thời gian CPU còn lại của tiến trình
-        đưa các tiến trình đến trong lúc chạy vào hàng đợi trước khi đưa lại tiến trình vừa chạy
-        nếu tiến trình vẫn còn thời gian CPU cần chạy: đưa tiến trình vào cuối hàng đợi
-        ngược lại: ghi nhận thời điểm hoàn tất
-```
+Với `quantum > 0`, phục vụ FIFO; tiến trình cùng arrival được xếp theo `processId` tăng dần. Nếu hàng đợi rỗng, ghi idle đến arrival kế tiếp. Mỗi lượt chạy kéo dài `min(quantum, remainingTime)`; cập nhật trace, start và remaining time. Sau lượt chạy, đưa các tiến trình mới đến vào hàng đợi trước tiến trình vừa hết quantum, kể cả arrival đúng lúc quantum kết thúc. Ghi completion nếu tiến trình đã xong; nếu chưa, đưa nó về cuối hàng đợi.
