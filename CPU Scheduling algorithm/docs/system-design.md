@@ -25,7 +25,7 @@ Mỗi tiến trình có `processId`, `arrivalTime`, `burstTime` và `priority`. 
 - `algorithm`: giao diện lập lịch và năm cài đặt thuật toán; chỉ quyết định tiến trình kế tiếp/chạy tiếp.
 - `simulation`: mô phỏng thời gian, xử lý tiến trình đến và CPU idle, ghi timeline.
 - `metrics`: tính completion, turnaround, waiting, response, throughput và CPU utilization từ timeline.
-- `cli`: nhận workload/cấu hình và trình bày kết quả.
+- `gui`: nhận workload/cấu hình và trình bày kết quả qua giao diện Swing.
 
 Tách bộ mô phỏng khỏi thuật toán giúp dùng chung cách ghi timeline và tính chỉ số; nhờ đó kết quả các thuật toán có thể so sánh trên cùng quy ước.
 
