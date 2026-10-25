@@ -1,6 +1,7 @@
 package gui;
 
 import algorithm.Fcfs;
+import algorithm.Priority;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -97,12 +98,29 @@ public final class CpuScheduler {
                     Comparator.comparingInt((SimProcess process) -> process.input.burstTime())
                             .thenComparingInt(process -> process.input.arrivalTime())
                             .thenComparing(process -> process.input.id()));
-            case PRIORITY -> runNonPreemptive(
-                    processes,
-                    timeline,
-                    Comparator.comparingInt((SimProcess process) -> process.input.priority())
-                            .thenComparingInt(process -> process.input.arrivalTime())
-                            .thenComparing(process -> process.input.id()));
+            case PRIORITY -> {
+                Priority.Result result = Priority.schedule(
+                        processes.stream()
+                                .map(process -> new Priority.Process(
+                                        process.input.id(),
+                                        process.input.arrivalTime(),
+                                        process.input.burstTime(),
+                                        process.input.priority()))
+                                .toList());
+                Map<String, SimProcess> processesById = processes.stream()
+                        .collect(Collectors.toMap(
+                                process -> process.input.id(), Function.identity()));
+                for (Priority.ExecutionSlice slice : result.timeline()) {
+                    timeline.add(new ExecutionSlice(
+                            slice.processId(), slice.startTime(), slice.endTime()));
+                }
+                for (Priority.ProcessTiming timing : result.processes()) {
+                    SimProcess process = processesById.get(timing.processId());
+                    process.startTime = timing.startTime();
+                    process.completionTime = timing.completionTime();
+                    process.remainingTime = 0;
+                }
+            }
             case SRTF -> runSrtf(processes, timeline);
             case ROUND_ROBIN -> runRoundRobin(processes, timeline, quantum);
         }
