@@ -1,11 +1,11 @@
-package algorithm;
-
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Scanner;
 
-public class Priority {
+public class priority {
 
     static class Process {
         String id;
@@ -28,16 +28,44 @@ public class Priority {
 
     public static void main(String[] args) {
         List<Process> processes = new ArrayList<>();
-        try (Scanner scanner = new Scanner(System.in)) {
-            int processCount = readInt(scanner, "Nhap so tien trinh: ", 1);
+        String csvFile = "data.csv";
 
-            for (int i = 1; i <= processCount; i++) {
-                System.out.printf("%nTiến trình P%d:%n", i);
-                int arrivalTime = readInt(scanner, "  Thoi diem den (AT): ", 0);
-                int burstTime = readInt(scanner, "  Thoi gian chay (BT): ", 1);
-                int priority = readInt(scanner, "  Do uu tien: ", 0);
-                processes.add(new Process("P" + i, arrivalTime, burstTime, priority));
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+            String line;
+            boolean isFirstLine = true;
+            
+            while ((line = br.readLine()) != null) {
+                line = line.trim();
+                if (line.isEmpty()) continue;
+
+                if (isFirstLine) {
+                    isFirstLine = false;
+                    String lowerLine = line.toLowerCase();
+                    if (lowerLine.contains("process") || lowerLine.contains("id") || lowerLine.contains("at")) {
+                        continue;
+                    }
+                }
+
+                String[] parts = line.split(",");
+                if (parts.length >= 4) {
+                    String id = parts[0].trim();
+                    int arrivalTime = Integer.parseInt(parts[1].trim());
+                    int burstTime = Integer.parseInt(parts[2].trim());
+                    int priority = Integer.parseInt(parts[3].trim());
+                    processes.add(new Process(id, arrivalTime, burstTime, priority));
+                }
             }
+        } catch (IOException e) {
+            System.out.println("Loi khi doc file : " + e.getMessage());
+            return;
+        } catch (NumberFormatException e) {
+            System.out.println("Loi dinh dang so trong file: " + e.getMessage());
+            return;
+        }
+
+        if (processes.isEmpty()) {
+            System.out.println("Khong co tien trinh nao duoc tai tu file.");
+            return;
         }
 
         int n = processes.size();
@@ -46,9 +74,8 @@ public class Priority {
         int currentTime = 0;
         List<String> gantt = new ArrayList<>();
 
-        // Vòng lặp mô phỏng
+        // Vòng lặp mô phỏng lập
         while (completedCount < n) {
-            // Tải danh sách công việc
             List<Process> readyQueue = new ArrayList<>();
             for (int i = 0; i < n; i++) {
                 if (!isCompleted[i] && processes.get(i).arrivalTime <= currentTime) {
@@ -75,7 +102,7 @@ public class Priority {
                 continue;
             }
 
-            //Chọn tiến trình đang ở trạng thái sẵn sàng có độ ưu tiên cao nhất
+            // Sắp xếp readyQueue
             readyQueue.sort(
                 Comparator.comparingInt((Process p) -> p.priority)
                           .thenComparingInt(p -> p.arrivalTime)
@@ -84,26 +111,27 @@ public class Priority {
 
             Process currentProcess = readyQueue.get(0);
             int originalIndex = processes.indexOf(currentProcess);
-            ///Thời điểm bắt đầu chạy
+
+            // Thực thi tiến trình
             currentProcess.startTime = currentTime;
-            ///Tiến trình chạy đến khi hoàn tất
+            // Chạy đến khi hoàn tất
             currentTime += currentProcess.burstTime;
-            /// Tính toán các chỉ số
+            
+            // Tính toán các thông số
             currentProcess.completionTime = currentTime;
             currentProcess.turnaroundTime = currentProcess.completionTime - currentProcess.arrivalTime;
             currentProcess.waitingTime = currentProcess.turnaroundTime - currentProcess.burstTime;
             currentProcess.responseTime = currentProcess.startTime - currentProcess.arrivalTime;
-            /// Đánh dấu tiến trình đã hoàn tất
+
             isCompleted[originalIndex] = true;
             completedCount++;
 
-            // Ghi nhận vào Gantt Chart
+            // Ghi nhận biểu đồ Gantt Chart
             gantt.add(currentProcess.id + " [" + currentProcess.startTime + "-" + currentProcess.completionTime + "]");
         }
 
-        // Hiển thị kết quả bảng thống kê
-        System.out.println("\nPRIORITY SCHEDULING (NON-PREEMPTIVE)");
-
+        // Hiển thị kết quả thống kê
+        System.out.println("PRIORITY SCHEDULING");
         System.out.printf("%-8s %-8s %-8s %-10s %-8s %-8s %-8s %-8s%n",
                 "Process", "AT", "BT", "Priority", "ST", "CT", "TAT", "WT");
 
@@ -123,31 +151,7 @@ public class Priority {
         System.out.println("\nGantt Chart:");
         System.out.println(String.join(" | ", gantt));
 
-        System.out.printf("%nAverage Waiting Time: %.2f%n",
-                totalWT / processes.size());
-
-        System.out.printf("Average Turnaround Time: %.2f%n",
-                totalTAT / processes.size());
-    }
-
-    private static int readInt(Scanner scanner, String prompt, int minimum) {
-        while (true) {
-            System.out.print(prompt);
-            if (!scanner.hasNext()) {
-                throw new IllegalStateException("Da het du lieu dau vao.");
-            }
-            if (!scanner.hasNextInt()) {
-                scanner.next();
-                System.out.println("Vui long nhap mot so nguyen.");
-                continue;
-            }
-
-            int value = scanner.nextInt();
-            if (value < minimum) {
-                System.out.printf("Gia tri phai lon hon hoac bang %d.%n", minimum);
-                continue;
-            }
-            return value;
-        }
+        System.out.printf("%nAverage Waiting Time: %.2f%n", totalWT / processes.size());
+        System.out.printf("Average Turnaround Time: %.2f%n", totalTAT / processes.size());
     }
 }
