@@ -17,7 +17,7 @@ flowchart LR
 
 ## Dữ liệu vào
 
-Mỗi tiến trình có `processId`, `arrivalTime`, `burstTime` và `priority`. `arrivalTime` không âm, `burstTime` phải lớn hơn 0. Priority có số nhỏ hơn là độ ưu tiên cao hơn. Round Robin nhận thêm `quantum` nguyên dương.
+Mỗi tiến trình có `processId`, `arrivalTime`, `burstTime` và `priority`; CSV UTF-8 có header `processId,arrivalTime,burstTime,priority`. `processId` phải duy nhất, `arrivalTime` không âm, `burstTime` phải lớn hơn 0. Priority có số nhỏ hơn là độ ưu tiên cao hơn. Round Robin nhận thêm `quantum` nguyên dương từ giao diện, không phải từ CSV.
 
 ## Các thành phần
 
@@ -31,4 +31,4 @@ Tách bộ mô phỏng khỏi thuật toán giúp dùng chung cách ghi timeline
 
 ## Kết quả
 
-Mỗi lần chạy trả về thứ tự các execution slice, thời điểm hoàn thành của từng tiến trình, Gantt chart và bảng chỉ số. Tiến trình đang chạy không tạo slice mới nếu tiếp tục chạy liên tục; các đoạn CPU idle được biểu diễn riêng.
+Mỗi lần chạy trả về thứ tự các execution slice, thời điểm hoàn thành của từng tiến trình, Gantt chart và bảng chỉ số. Tiến trình đang chạy không tạo slice mới nếu tiếp tục chạy liên tục; các đoạn CPU idle được biểu diễn riêng. Khi chạy từ thư mục `Code/`, GUI có thể nạp workload mẫu từ `input/data.csv` và xuất CSV kết quả gồm các dòng `TRACE`, `PROCESS`, `SUMMARY` đến vị trí người dùng chọn. Expected trace cho workload mẫu của các thuật toán được đối chiếu trong unit test, không lưu thêm CSV kết quả trùng dữ liệu.

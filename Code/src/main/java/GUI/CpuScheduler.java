@@ -1,11 +1,15 @@
 package GUI;
 
+import Algorithm.Fcfs;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 public final class CpuScheduler {
 
@@ -66,11 +70,27 @@ public final class CpuScheduler {
 
         List<ExecutionSlice> timeline = new ArrayList<>();
         switch (algorithm) {
-            case FCFS -> runNonPreemptive(
-                    processes,
-                    timeline,
-                    Comparator.comparingInt((SimProcess process) -> process.input.arrivalTime())
-                            .thenComparing(process -> process.input.id()));
+            case FCFS -> {
+                Fcfs.Result result = Fcfs.schedule(
+                        processes.stream()
+                                .map(process -> new Fcfs.Process(
+                                        process.input.id(),
+                                        process.input.arrivalTime(),
+                                        process.input.burstTime()))
+                                .toList());
+                Map<String, SimProcess> processesById = processes.stream()
+                        .collect(Collectors.toMap(
+                                process -> process.input.id(), Function.identity()));
+                for (Fcfs.ExecutionSlice slice : result.timeline()) {
+                    timeline.add(new ExecutionSlice(slice.processId(), slice.startTime(), slice.endTime()));
+                }
+                for (Fcfs.ProcessTiming timing : result.processes()) {
+                    SimProcess process = processesById.get(timing.processId());
+                    process.startTime = timing.startTime();
+                    process.completionTime = timing.completionTime();
+                    process.remainingTime = 0;
+                }
+            }
             case SJF -> runNonPreemptive(
                     processes,
                     timeline,
@@ -256,7 +276,7 @@ public final class CpuScheduler {
         }
     }
 
-    private static void addSlice(
+    static void addSlice(
             List<ExecutionSlice> timeline, String processId, int startTime, int endTime) {
         if (startTime == endTime) {
             return;
@@ -311,13 +331,13 @@ public final class CpuScheduler {
                 processCount / endTime);
     }
 
-    private static final class SimProcess {
-        private final ProcessInput input;
-        private int remainingTime;
-        private int startTime = -1;
-        private int completionTime = -1;
+    static final class SimProcess {
+        final ProcessInput input;
+        int remainingTime;
+        int startTime = -1;
+        int completionTime = -1;
 
-        private SimProcess(ProcessInput input) {
+        SimProcess(ProcessInput input) {
             this.input = input;
             remainingTime = input.burstTime();
         }

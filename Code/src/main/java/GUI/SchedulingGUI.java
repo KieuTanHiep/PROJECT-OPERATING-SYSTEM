@@ -3,11 +3,15 @@ package GUI;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
 import java.awt.GridLayout;
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import javax.swing.event.TableModelEvent;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -41,7 +45,10 @@ public class SchedulingGUI extends JFrame {
             return false;
         }
     };
-    private final JLabel summaryLabel = new JLabel("Nhập tiến trình rồi chọn thuật toán để bắt đầu.");
+    private final JLabel summaryLabel = new JLabel("Thêm tiến trình hoặc nạp CSV để bắt đầu.");
+    private CpuScheduler.ScheduleResult lastResult;
+    private CpuScheduler.Algorithm lastAlgorithm;
+    private int lastQuantum;
 
     public SchedulingGUI() {
         super("CPU Scheduling Simulator");
@@ -52,7 +59,13 @@ public class SchedulingGUI extends JFrame {
         add(createControls(), BorderLayout.NORTH);
         add(createInputPanel(), BorderLayout.CENTER);
         add(createResultsPanel(), BorderLayout.SOUTH);
-        addSampleProcesses();
+        inputModel.addTableModelListener(event -> {
+            if (event.getType() == TableModelEvent.UPDATE
+                    || event.getType() == TableModelEvent.INSERT
+                    || event.getType() == TableModelEvent.DELETE) {
+                invalidateResult();
+            }
+        });
 
         algorithmBox.addActionListener(event -> updateQuantumState());
         updateQuantumState();
@@ -67,6 +80,14 @@ public class SchedulingGUI extends JFrame {
         controls.add(algorithmBox);
         controls.add(new JLabel("Quantum:"));
         controls.add(quantumSpinner);
+
+        JButton importButton = new JButton("Nạp CSV");
+        importButton.addActionListener(event -> importCsv());
+        controls.add(importButton);
+
+        JButton exportButton = new JButton("Xuất kết quả CSV");
+        exportButton.addActionListener(event -> exportCsv());
+        controls.add(exportButton);
 
         JButton addButton = new JButton("Thêm tiến trình");
         addButton.addActionListener(event -> inputModel.addRow(
@@ -107,12 +128,6 @@ public class SchedulingGUI extends JFrame {
         return panel;
     }
 
-    private void addSampleProcesses() {
-        inputModel.addRow(new Object[] {"P1", 0, 5, 2});
-        inputModel.addRow(new Object[] {"P2", 1, 3, 1});
-        inputModel.addRow(new Object[] {"P3", 2, 2, 3});
-    }
-
     private void updateQuantumState() {
         quantumSpinner.setEnabled(algorithmBox.getSelectedItem() == CpuScheduler.Algorithm.ROUND_ROBIN);
     }
@@ -136,6 +151,9 @@ public class SchedulingGUI extends JFrame {
             int quantum = (Integer) quantumSpinner.getValue();
             CpuScheduler.ScheduleResult result =
                     CpuScheduler.schedule(processes, algorithm, quantum);
+            lastResult = result;
+            lastAlgorithm = algorithm;
+            lastQuantum = quantum;
             displayResult(result);
         } catch (IllegalArgumentException | ArithmeticException exception) {
             JOptionPane.showMessageDialog(
@@ -144,6 +162,59 @@ public class SchedulingGUI extends JFrame {
             JOptionPane.showMessageDialog(
                     this, exception.getMessage(), "Chưa triển khai", JOptionPane.INFORMATION_MESSAGE);
         }
+    }
+
+    private void importCsv() {
+        JFileChooser chooser = new JFileChooser(Path.of("input").toFile());
+        chooser.setDialogTitle("Chọn tệp CSV tiến trình");
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            List<CpuScheduler.ProcessInput> processes =
+                    CsvScheduleFiles.readProcesses(chooser.getSelectedFile().toPath());
+            inputModel.setRowCount(0);
+            for (CpuScheduler.ProcessInput process : processes) {
+                inputModel.addRow(new Object[] {
+                    process.id(), process.arrivalTime(), process.burstTime(), process.priority()
+                });
+            }
+            ganttOutput.setText("");
+            resultModel.setRowCount(0);
+            summaryLabel.setText("Đã nạp " + processes.size() + " tiến trình từ CSV.");
+        } catch (IOException | IllegalArgumentException exception) {
+            JOptionPane.showMessageDialog(
+                    this, exception.getMessage(), "Không thể nạp CSV", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void exportCsv() {
+        if (lastResult == null) {
+            JOptionPane.showMessageDialog(
+                    this, "Hãy chạy mô phỏng trước khi xuất kết quả.",
+                    "Chưa có kết quả", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        JFileChooser chooser = new JFileChooser(Path.of("output").toFile());
+        chooser.setSelectedFile(Path.of("schedule-results.csv").toFile());
+        chooser.setDialogTitle("Lưu trace và kết quả CSV");
+        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            CsvScheduleFiles.writeResult(
+                    chooser.getSelectedFile().toPath(), lastAlgorithm, lastQuantum, lastResult);
+        } catch (IOException exception) {
+            JOptionPane.showMessageDialog(
+                    this, exception.getMessage(), "Không thể xuất CSV", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void invalidateResult() {
+        lastResult = null;
+        ganttOutput.setText("");
+        resultModel.setRowCount(0);
+        summaryLabel.setText("Danh sách tiến trình đã thay đổi; hãy chạy mô phỏng lại.");
     }
 
     private List<CpuScheduler.ProcessInput> readProcesses() {

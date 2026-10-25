@@ -1,79 +1,102 @@
 # PROJECT-OPERATING-SYSTEM
+
 # CPU Scheduling Algorithm Comparison
 
-Dự án mô phỏng và so sánh 5 thuật toán lập lịch CPU: FCFS, SJF, Priority không ngắt, SRTF, Round Robin có ngắt. Mục tiêu là chạy các thuật toán trên cùng workload, quan sát execution trace/Gantt chart và so sánh các chỉ số lập lịch.
+Ứng dụng desktop Java Swing mô phỏng và so sánh năm thuật toán lập lịch CPU: FCFS, SJF, Priority không ngắt, SRTF và Round Robin. Chương trình hiển thị Gantt chart, kết quả từng tiến trình và các chỉ số tổng hợp; hỗ trợ nạp workload và xuất kết quả CSV.
 
-> **Trạng thái:** Hiện có tài liệu thiết kế, mã giả, quy tắc lập lịch và kế hoạch kiểm thử. Các thuật toán, ứng dụng chạy mô phỏng, Gantt chart và kiểm thử Java chưa được triển khai; các chức năng dưới đây là dự kiến.
+## Cấu trúc dự án
 
-## Năm thuật toán
+- `Code/`: mã nguồn ứng dụng, workload CSV, test, cấu hình Maven và thư mục build.
+- `DOCX/docs/`: tài liệu thiết kế, quy tắc, mã giả và lưu đồ thuật toán.
+- `Extra/`: tài liệu bổ sung.
+- `PPTX/`: tài liệu trình bày.
 
-- **FCFS:** không ngắt, theo thứ tự đến; hòa theo `processId`.
+## Thuật toán
+
+- **FCFS:** không ngắt, theo thời điểm đến; nếu hòa thì theo `processId`.
 - **SJF:** không ngắt, chọn burst ngắn nhất trong các tiến trình đã đến.
 - **SRTF:** có ngắt, chọn thời gian còn lại ngắn nhất; giữ tiến trình đang chạy nếu vẫn tối ưu.
 - **Priority:** không ngắt; số priority nhỏ hơn có độ ưu tiên cao hơn.
-- **Round Robin:** có ngắt theo `quantum`, phục vụ theo hàng đợi FIFO.
+- **Round Robin:** có ngắt theo `quantum`, phục vụ theo FIFO.
 
-Quy tắc tie-break, CPU idle, preemption, công thức chỉ số và các giả định mô hình được mô tả trong [scheduling-rules.md](./CPU%20Scheduling%20algorithm/docs/scheduling-rules.md).
+Quy tắc tie-break, CPU idle, preemption và công thức chỉ số nằm trong [scheduling-rules.md](./DOCX/docs/scheduling-rules.md).
+
+## Chạy ứng dụng
+
+Cần cài Java 21 và Maven. Từ thư mục gốc repository:
+
+```powershell
+cd Code
+mvn clean test
+mvn package
+java -cp target/classes GUI.SchedulingGUI
+```
+
+Hoặc chạy test mà không đổi thư mục hiện tại:
+
+```powershell
+mvn -f "Code/pom.xml" clean test
+```
+
+GUI khởi động với danh sách tiến trình trống. Dùng **Thêm tiến trình** để nhập thủ công hoặc chọn **Nạp CSV** để nạp `Code/input/data.csv`. Khi nạp, dữ liệu hiện tại được thay thế hoàn toàn. Chọn thuật toán, đặt quantum khi chạy Round Robin, rồi bấm **Chạy mô phỏng**. **Xuất kết quả CSV** mở hộp thoại lưu kết quả, mặc định tại `Code/output/schedule-results.csv`.
+
+## Định dạng workload CSV
+
+CSV đầu vào dùng UTF-8 và có header theo đúng thứ tự:
+
+```csv
+processId,arrivalTime,burstTime,priority
+P1,0,7,3
+P2,2,4,1
+```
+
+Mỗi `processId` phải duy nhất; `arrivalTime` là số nguyên không âm; `burstTime` là số nguyên dương. Priority nhỏ hơn nghĩa là ưu tiên cao hơn. Quantum là cấu hình Round Robin trên GUI, không phải cột trong CSV.
+
+Chỉ có một workload CSV mẫu tại [data.csv](./Code/input/data.csv). Unit test dùng workload này để so sánh timeline mong đợi và thực tế cho cả năm thuật toán (quantum 2 cho Round Robin). Kế hoạch các ca kiểm thử thủ công nằm trong [test-plan.csv](./Code/tests/test-plan.csv).
+
+CSV kết quả gồm ba loại dòng: `TRACE` (các đoạn chạy và `IDLE`), `PROCESS` (thời điểm và chỉ số từng tiến trình), `SUMMARY` (các chỉ số trung bình, CPU utilization dạng tỷ lệ 0–1 và throughput).
+
+## Mã nguồn và test
+
+- [SchedulingGUI.java](<./Code/src/main/java/GUI/SchedulingGUI.java>): giao diện desktop.
+- [CpuScheduler.java](<./Code/src/main/java/GUI/CpuScheduler.java>): kiểm tra dữ liệu, điều phối thuật toán và tổng hợp kết quả.
+- [Fcfs.java](<./Code/src/main/java/Algorithm/Fcfs.java>): thuật toán FCFS trong package riêng `Algorithm`.
+- `Code/src/main/java/GUI/CsvScheduleFiles.java`: đọc workload và ghi kết quả CSV.
+- `Code/src/test/java/`: kiểm thử tự động cho thuật toán và CSV; chạy bằng `mvn test`.
 
 ## Tài liệu
 
-Các đường dẫn dưới đây tính từ thư mục `CPU Scheduling algorithm/`:
+- [system-design.md](./DOCX/docs/system-design.md): luồng xử lý và thành phần hệ thống.
+- [pseudocode.md](./DOCX/docs/pseudocode.md): mã giả năm thuật toán.
+- [scheduling-rules.md](./DOCX/docs/scheduling-rules.md): quy ước và công thức.
+- [Flowcharts](./DOCX/docs/flowcharts/): lưu đồ FCFS, SJF, SRTF, Priority và Round Robin.
 
-- `docs/system-design.md`: mô hình Input → Scheduler → Output và kiến trúc dự kiến.
-- `docs/pseudocode.md`: mã giả của 5 thuật toán.
-- `docs/flowcharts/`: thư mục dành cho lưu đồ thuật toán.
-- `docs/scheduling-rules.md`: quy ước tie-break, CPU idle, preemption và công thức chỉ số.
-- `input/sample.csv`: vị trí workload mẫu (tệp hiện đang trống).
-- `tests/test-plan.csv`: kế hoạch các ca kiểm thử.
-- `tests/expected-results.csv`: kết quả chuẩn dự kiến cho workload.
+## Công nghệ và giới hạn
 
-## Công nghệ
-
-- Java 21
-- Maven
-- JUnit Jupiter 5 (phụ thuộc kiểm thử đã khai báo trong `CPU Scheduling algorithm/pom.xml`)
-
-Mã nguồn ứng dụng và kiểm thử Java dự kiến lần lượt đặt dưới `src/main/java/` và `src/test/java/`. 
+- Java 21, Maven, Swing, JUnit Jupiter 5.
+- Mô hình một CPU, biết trước CPU burst, không có I/O blocking, priority aging hoặc chi phí chuyển ngữ cảnh.
+- Kế hoạch stress/performance test nằm trong `Code/tests/test-plan.csv`; cần chạy và ghi số liệu, cấu hình máy, phân tích độ phức tạp vào báo cáo. Báo cáo cuối cùng và video demo công khai do nhóm bổ sung.
 
 ## Cấu trúc thư mục
 
 ```text
 PROJECT-OPERATING-SYSTEM/
-├── README.md
-└── CPU Scheduling algorithm/
-    ├── docs/
-    │   ├── flowcharts/          
-    │   ├── pseudocode.md
-    │   ├── scheduling-rules.md
-    │   └── system-design.md
-    ├── input/
-    │   └── sample.csv           
-    ├── src/
-    │   ├── main/java/           # Mã nguồn dự kiến
-    │   └── test/java/           # Kiểm thử Java dự kiến
-    ├── tests/
-    │   ├── expected-results.csv
-    │   └── test-plan.csv
-    └── pom.xml
+├── Code/
+│   ├── input/data.csv
+│   ├── output/
+│   ├── src/
+│   │   ├── main/java/
+│   │   │   ├── Algorithm/
+│   │   │   └── GUI/
+│   │   └── test/java/
+│   ├── tests/test-plan.csv
+│   └── pom.xml
+├── DOCX/docs/
+│   ├── flowcharts/
+│   ├── pseudocode.md
+│   ├── scheduling-rules.md
+│   └── system-design.md
+├── Extra/
+├── PPTX/
+└── README.md
 ```
-
-## Chức năng dự kiến
-
-- Kiểm tra dữ liệu tiến trình và cấu hình thuật toán.
-- Mô phỏng năm thuật toán, ghi nhận CPU idle, thời điểm bắt đầu/hoàn tất và execution trace để dựng Gantt chart.
-- Tính turnaround, waiting, response time, throughput và CPU utilization.
-- Trình bày, so sánh kết quả trên cùng workload.
-
-Đây là mục tiêu phát triển, không phải các chức năng đã được triển khai.
-
-
-## Chạy kiểm thử
-
-Cần cài Java 21 và Maven. Từ thư mục dự án:
-
-```bash
-cd "CPU Scheduling algorithm"
-mvn test
-```
-
-

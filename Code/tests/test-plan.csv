@@ -1,0 +1,18 @@
+Mã test,Nhóm kiểm thử,Mục tiêu,Cách thực hiện,Kết quả mong đợi
+CSV-01,Dữ liệu đầu vào,Đọc workload mẫu,Nạp input/data.csv trên giao diện,Đọc đủ 5 tiến trình; không thêm trùng hoặc mất dòng
+CSV-02,Dữ liệu đầu vào,Từ chối processId trùng,Nạp CSV có hai tiến trình trùng processId,Báo lỗi rõ dòng bị lỗi; không thay đổi danh sách đang có
+CSV-03,Dữ liệu đầu vào,Từ chối thời gian không hợp lệ,"Thử arrivalTime âm, burstTime bằng 0 hoặc giá trị không phải số nguyên",Báo lỗi rõ cột/dòng; ứng dụng không bị dừng
+CSV-04,Dữ liệu đầu vào,Từ chối CSV sai cấu trúc,"Thử file rỗng, thiếu header, sai tên header hoặc dòng không đủ 4 cột",Hiện thông báo lỗi định dạng CSV; không nạp một phần dữ liệu
+ALG-01,FCFS,Kiểm tra thứ tự đến và khoảng CPU rỗi,Chạy input/data.csv với FCFS,Tiến trình chạy theo arrivalTime; có IDLE từ 15 đến 20
+ALG-02,SJF,Chọn burst ngắn nhất trong hàng đợi,Chạy input/data.csv với SJF,"Sau P1, chọn tiến trình sẵn sàng có burstTime ngắn nhất"
+ALG-03,SRTF,Kiểm tra ngắt tiến trình,Chạy input/data.csv với SRTF,"P1 bị ngắt khi tiến trình ngắn hơn đến; trace thể hiện đúng các mốc thời gian"
+ALG-04,Priority,Chọn mức ưu tiên cao nhất,Chạy input/data.csv với Priority,"Trong các tiến trình sẵn sàng, số priority nhỏ hơn được chạy trước"
+ALG-05,Round Robin,Kiểm tra hàng đợi và quantum,Chạy input/data.csv với Round Robin; quantum = 2,"Mỗi lượt chạy tối đa 2 đơn vị; tiến trình chưa xong quay lại cuối hàng đợi"
+ALG-06,Round Robin,Từ chối quantum không hợp lệ,Chạy Round Robin với quantum bằng 0,Hiện thông báo quantum phải lớn hơn 0
+OUT-01,Kết quả,Kiểm tra Gantt chart và bảng chỉ số,Chạy từng thuật toán với workload mẫu,"Hiện timeline, completionTime, turnaroundTime, waitingTime và responseTime"
+OUT-02,Kết quả CSV,Kiểm tra xuất kết quả,Chạy mô phỏng rồi chọn Xuất kết quả CSV,"File có các dòng TRACE, PROCESS và SUMMARY; mở được bằng bảng tính"
+OUT-03,Kết quả CSV,Không xuất kết quả cũ sau khi sửa input,"Chạy mô phỏng, sửa hoặc nạp lại danh sách tiến trình rồi thử xuất","Kết quả cũ bị vô hiệu hóa; yêu cầu chạy mô phỏng lại"
+EDGE-01,Biên,Kiểm tra workload rỗng,Xóa hết tiến trình rồi chạy mô phỏng,"Hiện thông báo cần ít nhất một tiến trình; giao diện vẫn hoạt động"
+EDGE-02,Biên,Kiểm tra CPU rỗi trước tiến trình đầu tiên,Dùng workload có arrivalTime đầu tiên lớn hơn 0,"Trace có khoảng IDLE từ thời điểm 0 đến arrivalTime đầu tiên"
+PERF-01,Hiệu năng,Đo thời gian với workload lớn,"Chạy mỗi thuật toán với 100, 500 và 1000 tiến trình; lặp lại sau một lần làm nóng","Ghi thời gian chạy, cấu hình máy và kích thước input; không bỏ sót tiến trình"
+PERF-02,Hiệu năng,Tổng hợp và nhận xét độ phức tạp,Lấy trung vị các lần đo cho từng kích thước và thuật toán,"Báo cáo số liệu và nhận xét xu hướng; không chỉ đưa ảnh chụp"
