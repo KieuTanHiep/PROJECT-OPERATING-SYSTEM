@@ -1,8 +1,8 @@
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import GUI.CpuScheduler;
-import GUI.CsvScheduleFiles;
+import gui.CpuScheduler;
+import gui.CsvScheduleFiles;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;

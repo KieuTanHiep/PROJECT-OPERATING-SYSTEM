@@ -1,6 +1,6 @@
-package GUI;
+package gui;
 
-import Algorithm.Fcfs;
+import algorithm.Fcfs;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
