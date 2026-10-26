@@ -1,149 +1,128 @@
+package algorithm;
 
-import java.util.Scanner;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-public class SRTF {
+public final class Srtf {
 
-    static class Process {
-        int pid;
-        int arrivalTime;
-        int burstTime;
-        int remainingTime;
-        int completionTime;
-        int turnaroundTime;
-        int waitingTime;
-        int responseTime;
-        boolean started = false;
+    public record Process(String id, int arrivalTime, int burstTime) {}
 
-        Process(int pid, int arrivalTime, int burstTime) {
-            this.pid = pid;
-            this.arrivalTime = arrivalTime;
-            this.burstTime = burstTime;
-            this.remainingTime = burstTime;
-        }
-    }
+    public record ExecutionSlice(String processId, int startTime, int endTime) {}
 
-    public static void main(String[] args) {
-        Scanner sc = new Scanner(System.in);
+    public record ProcessTiming(String processId, int startTime, int completionTime) {}
 
-        System.out.print("Nhap so tien trinh: ");
-        int n = sc.nextInt();
+    public record Result(List<ExecutionSlice> timeline, List<ProcessTiming> processes) {}
 
-        if (n <= 0) {
-            System.out.println("So tien trinh phai lon hon 0!");
-            sc.close();
-            return;
-        }
+    private static final Comparator<SimProcess> REMAINING_TIME_ORDER =
+            Comparator.comparingInt((SimProcess process) -> process.remainingTime)
+                    .thenComparingInt(process -> process.input.arrivalTime())
+                    .thenComparing(process -> process.input.id());
 
-        Process[] p = new Process[n];
+    private Srtf() {}
 
-        for (int i = 0; i < n; i++) {
-            System.out.println("\nTien trinh P" + (i + 1));
-
-            System.out.print("Thoi diem den (AT): ");
-            int at = sc.nextInt();
-
-            System.out.print("Thoi gian xu ly (BT): ");
-            int bt = sc.nextInt();
-
-            if (at < 0 || bt <= 0) {
-                System.out.println("AT phai >= 0 va BT phai > 0!");
-                sc.close();
-                return;
-            }
-
-            p[i] = new Process(i + 1, at, bt);
-        }
-
+    public static Result schedule(List<Process> inputs) {
+        validate(inputs);
+        List<SimProcess> processes = inputs.stream().map(SimProcess::new).toList();
+        List<ExecutionSlice> timeline = new ArrayList<>();
+        int currentTime = 0;
         int completed = 0;
-        int time = 0;
-        double totalWT = 0;
-        double totalTAT = 0;
+        SimProcess running = null;
 
-        System.out.println("\n===== THUAT TOAN SRTF =====");
+        while (completed < processes.size()) {
+            int schedulingTime = currentTime;
+            SimProcess previous = running;
+            SimProcess best = processes.stream()
+                    .filter(process -> process.remainingTime > 0)
+                    .filter(process -> process.input.arrivalTime() <= schedulingTime)
+                    .min(REMAINING_TIME_ORDER)
+                    .orElse(null);
 
-        while (completed < n) {
-            Process current = null;
-
-            // Tim tien trinh da den co thoi gian con lai nho nhat
-            for (Process process : p) {
-                if (process.arrivalTime <= time
-                        && process.remainingTime > 0) {
-
-                    if (current == null
-                            || process.remainingTime
-                            < current.remainingTime
-                            || (process.remainingTime
-                            == current.remainingTime
-                            && process.arrivalTime
-                            < current.arrivalTime)) {
-                        current = process;
-                    }
-                }
-            }
-
-            // Neu chua co tien trinh nao den
-            if (current == null) {
-                time++;
+            if (best == null) {
+                int nextArrival = processes.stream()
+                        .filter(process -> process.remainingTime > 0)
+                        .mapToInt(process -> process.input.arrivalTime())
+                        .min()
+                        .orElseThrow();
+                timeline.add(new ExecutionSlice("IDLE", currentTime, nextArrival));
+                currentTime = nextArrival;
+                running = null;
                 continue;
             }
 
-            // Ghi nhan thoi diem phan hoi lan dau
-            if (!current.started) {
-                current.responseTime =
-                        time - current.arrivalTime;
-                current.started = true;
+            if (previous != null
+                    && previous.remainingTime > 0
+                    && previous.input.arrivalTime() <= currentTime
+                    && previous.remainingTime == best.remainingTime) {
+                running = previous;
+            } else {
+                running = best;
             }
 
-            // CPU xu ly 1 don vi thoi gian
-            current.remainingTime--;
-            time++;
+            if (running.startTime < 0) {
+                running.startTime = currentTime;
+            }
+            int endTime = Math.addExact(currentTime, 1);
+            addSlice(timeline, running.input.id(), currentTime, endTime);
+            running.remainingTime--;
+            currentTime = endTime;
 
-            // Neu tien trinh hoan thanh
-            if (current.remainingTime == 0) {
-                current.completionTime = time;
-
-                current.turnaroundTime =
-                        current.completionTime
-                        - current.arrivalTime;
-
-                current.waitingTime =
-                        current.turnaroundTime
-                        - current.burstTime;
-
-                totalWT += current.waitingTime;
-                totalTAT += current.turnaroundTime;
+            if (running.remainingTime == 0) {
+                running.completionTime = currentTime;
                 completed++;
+                running = null;
             }
         }
 
-        // In ket qua theo thu tu tien trinh
-        System.out.println("\nPID\tAT\tBT\tCT\tTAT\tWT\tRT");
+        List<ProcessTiming> timings = processes.stream()
+                .map(process -> new ProcessTiming(
+                        process.input.id(), process.startTime, process.completionTime))
+                .toList();
+        return new Result(List.copyOf(timeline), timings);
+    }
 
-        for (Process process : p) {
-            System.out.printf(
-                "P%d\t%d\t%d\t%d\t%d\t%d\t%d%n",
-                process.pid,
-                process.arrivalTime,
-                process.burstTime,
-                process.completionTime,
-                process.turnaroundTime,
-                process.waitingTime,
-                process.responseTime
-            );
+    private static void addSlice(
+            List<ExecutionSlice> timeline, String processId, int startTime, int endTime) {
+        if (!timeline.isEmpty()) {
+            ExecutionSlice previous = timeline.get(timeline.size() - 1);
+            if (previous.processId().equals(processId) && previous.endTime() == startTime) {
+                timeline.set(timeline.size() - 1,
+                        new ExecutionSlice(processId, previous.startTime(), endTime));
+                return;
+            }
         }
+        timeline.add(new ExecutionSlice(processId, startTime, endTime));
+    }
 
-        System.out.printf(
-            "\nThoi gian cho trung binh (AWT): %.2f%n",
-            totalWT / n
-        );
+    private static void validate(List<Process> processes) {
+        if (processes == null || processes.isEmpty()) {
+            throw new IllegalArgumentException("SRTF cần ít nhất một tiến trình.");
+        }
+        Set<String> ids = new HashSet<>();
+        for (Process process : processes) {
+            if (process == null || process.id() == null || process.id().isBlank()) {
+                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
+            }
+            if (!ids.add(process.id().trim())) {
+                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
+            }
+            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
+                throw new IllegalArgumentException("arrivalTime phải >= 0 và burstTime phải > 0.");
+            }
+        }
+    }
 
-        System.out.printf(
-            "Thoi gian quay vong trung binh (ATAT): %.2f%n",
-            totalTAT / n
-        );
+    private static final class SimProcess {
+        private final Process input;
+        private int remainingTime;
+        private int startTime = -1;
+        private int completionTime = -1;
 
-        sc.close();
+        private SimProcess(Process input) {
+            this.input = input;
+            remainingTime = input.burstTime();
+        }
     }
 }

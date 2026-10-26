@@ -2,6 +2,8 @@ package gui;
 
 import algorithm.Fcfs;
 import algorithm.Priority;
+import algorithm.Sjf;
+import algorithm.Srtf;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -92,12 +94,28 @@ public final class CpuScheduler {
                     process.remainingTime = 0;
                 }
             }
-            case SJF -> runNonPreemptive(
-                    processes,
-                    timeline,
-                    Comparator.comparingInt((SimProcess process) -> process.input.burstTime())
-                            .thenComparingInt(process -> process.input.arrivalTime())
-                            .thenComparing(process -> process.input.id()));
+            case SJF -> {
+                Sjf.Result result = Sjf.schedule(
+                        processes.stream()
+                                .map(process -> new Sjf.Process(
+                                        process.input.id(),
+                                        process.input.arrivalTime(),
+                                        process.input.burstTime()))
+                                .toList());
+                Map<String, SimProcess> processesById = processes.stream()
+                        .collect(Collectors.toMap(
+                                process -> process.input.id(), Function.identity()));
+                for (Sjf.ExecutionSlice slice : result.timeline()) {
+                    timeline.add(new ExecutionSlice(
+                            slice.processId(), slice.startTime(), slice.endTime()));
+                }
+                for (Sjf.ProcessTiming timing : result.processes()) {
+                    SimProcess process = processesById.get(timing.processId());
+                    process.startTime = timing.startTime();
+                    process.completionTime = timing.completionTime();
+                    process.remainingTime = 0;
+                }
+            }
             case PRIORITY -> {
                 Priority.Result result = Priority.schedule(
                         processes.stream()
@@ -121,7 +139,28 @@ public final class CpuScheduler {
                     process.remainingTime = 0;
                 }
             }
-            case SRTF -> runSrtf(processes, timeline);
+            case SRTF -> {
+                Srtf.Result result = Srtf.schedule(
+                        processes.stream()
+                                .map(process -> new Srtf.Process(
+                                        process.input.id(),
+                                        process.input.arrivalTime(),
+                                        process.input.burstTime()))
+                                .toList());
+                Map<String, SimProcess> processesById = processes.stream()
+                        .collect(Collectors.toMap(
+                                process -> process.input.id(), Function.identity()));
+                for (Srtf.ExecutionSlice slice : result.timeline()) {
+                    timeline.add(new ExecutionSlice(
+                            slice.processId(), slice.startTime(), slice.endTime()));
+                }
+                for (Srtf.ProcessTiming timing : result.processes()) {
+                    SimProcess process = processesById.get(timing.processId());
+                    process.startTime = timing.startTime();
+                    process.completionTime = timing.completionTime();
+                    process.remainingTime = 0;
+                }
+            }
             case ROUND_ROBIN -> runRoundRobin(processes, timeline, quantum);
         }
 
@@ -157,93 +196,6 @@ public final class CpuScheduler {
             }
             if (input.burstTime() <= 0) {
                 throw new IllegalArgumentException("Thời gian chạy phải lớn hơn 0.");
-            }
-        }
-    }
-
-    private static void runNonPreemptive(
-            List<SimProcess> processes,
-            List<ExecutionSlice> timeline,
-            Comparator<SimProcess> selector) {
-        int currentTime = 0;
-        int completed = 0;
-
-        while (completed < processes.size()) {
-            int schedulingTime = currentTime;
-            SimProcess next = processes.stream()
-                    .filter(process -> process.completionTime < 0)
-                    .filter(process -> process.input.arrivalTime() <= schedulingTime)
-                    .min(selector)
-                    .orElse(null);
-
-            if (next == null) {
-                int nextArrival = processes.stream()
-                        .filter(process -> process.completionTime < 0)
-                        .mapToInt(process -> process.input.arrivalTime())
-                        .min()
-                        .orElseThrow();
-                addSlice(timeline, "IDLE", currentTime, nextArrival);
-                currentTime = nextArrival;
-                continue;
-            }
-
-            next.startTime = currentTime;
-            currentTime = Math.addExact(currentTime, next.input.burstTime());
-            next.remainingTime = 0;
-            next.completionTime = currentTime;
-            completed++;
-            addSlice(timeline, next.input.id(), next.startTime, currentTime);
-        }
-    }
-
-    private static void runSrtf(List<SimProcess> processes, List<ExecutionSlice> timeline) {
-        int currentTime = 0;
-        int completed = 0;
-        SimProcess running = null;
-
-        while (completed < processes.size()) {
-            int schedulingTime = currentTime;
-            SimProcess previous = running;
-            SimProcess best = processes.stream()
-                    .filter(process -> process.remainingTime > 0)
-                    .filter(process -> process.input.arrivalTime() <= schedulingTime)
-                    .min(Comparator.comparingInt((SimProcess process) -> process.remainingTime)
-                            .thenComparingInt(process -> process.input.arrivalTime())
-                            .thenComparing(process -> process.input.id()))
-                    .orElse(null);
-
-            if (best == null) {
-                int nextArrival = processes.stream()
-                        .filter(process -> process.remainingTime > 0)
-                        .mapToInt(process -> process.input.arrivalTime())
-                        .min()
-                        .orElseThrow();
-                addSlice(timeline, "IDLE", currentTime, nextArrival);
-                currentTime = nextArrival;
-                running = null;
-                continue;
-            }
-
-            if (previous != null
-                    && previous.remainingTime > 0
-                    && previous.input.arrivalTime() <= currentTime
-                    && previous.remainingTime == best.remainingTime) {
-                running = previous;
-            } else {
-                running = best;
-            }
-
-            if (running.startTime < 0) {
-                running.startTime = currentTime;
-            }
-            addSlice(timeline, running.input.id(), currentTime, Math.addExact(currentTime, 1));
-            running.remainingTime--;
-            currentTime = Math.addExact(currentTime, 1);
-
-            if (running.remainingTime == 0) {
-                running.completionTime = currentTime;
-                completed++;
-                running = null;
             }
         }
     }

@@ -1,147 +1,77 @@
-package Algorithm;
+package algorithm;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Scanner;
+import java.util.Set;
 
-public class Sjf {
+public final class Sjf {
 
-    static class Process {
-        String id;
-        int arrivalTime;
-        int burstTime;
-        int startTime;
-        int completionTime;
-        int waitingTime;
-        int turnaroundTime;
+    public record Process(String id, int arrivalTime, int burstTime) {}
 
-        Process(String id, int arrivalTime, int burstTime) {
-            this.id = id;
-            this.arrivalTime = arrivalTime;
-            this.burstTime = burstTime;
-        }
-    }
+    public record ExecutionSlice(String processId, int startTime, int endTime) {}
 
-    public static void main(String[] args) {
-        List<Process> processes = new ArrayList<>();
-        try (Scanner scanner = new Scanner(System.in)) {
-            int processCount = readInt(scanner, "Nhap so tien trinh: ", 1);
+    public record ProcessTiming(String processId, int startTime, int completionTime) {}
 
-            for (int i = 1; i <= processCount; i++) {
-                System.out.printf("%nTiến trình P%d:%n", i);
-                int arrivalTime = readInt(scanner, "  Thoi diem den (AT): ", 0);
-                int burstTime = readInt(scanner, "  Thoi gian chay (BT): ", 1);
-                processes.add(new Process("P" + i, arrivalTime, burstTime));
-            }
-        }
+    public record Result(List<ExecutionSlice> timeline, List<ProcessTiming> processes) {}
 
-        int n = processes.size();
-        boolean[] isCompleted = new boolean[n];
-        int completedCount = 0;
+    private static final Comparator<Process> BURST_ORDER =
+            Comparator.comparingInt(Process::burstTime)
+                    .thenComparingInt(Process::arrivalTime)
+                    .thenComparing(Process::id);
+
+    private Sjf() {}
+
+    public static Result schedule(List<Process> inputs) {
+        validate(inputs);
+        List<Process> unfinished = new ArrayList<>(inputs);
+        List<ExecutionSlice> timeline = new ArrayList<>();
+        List<ProcessTiming> timings = new ArrayList<>();
         int currentTime = 0;
-        List<String> gantt = new ArrayList<>();
 
-        // Vòng lặp mô phỏng
-        while (completedCount < n) {
-            // Tải danh sách công việc vào hàng chờ
-            List<Process> readyQueue = new ArrayList<>();
-            for (int i = 0; i < n; i++) {
-                if (!isCompleted[i] && processes.get(i).arrivalTime <= currentTime) {
-                    readyQueue.add(processes.get(i));
-                }
-            }
+        while (!unfinished.isEmpty()) {
+            int schedulingTime = currentTime;
+            Process next = unfinished.stream()
+                    .filter(process -> process.arrivalTime() <= schedulingTime)
+                    .min(BURST_ORDER)
+                    .orElse(null);
 
-            // Kiểm tra nếu hàng chờ trống (CPU Idle)
-            if (readyQueue.isEmpty()) {
-                int nextArrival = Integer.MAX_VALUE;
-                for (int i = 0; i < n; i++) {
-                    if (!isCompleted[i] && processes.get(i).arrivalTime > currentTime) {
-                        if (processes.get(i).arrivalTime < nextArrival) {
-                            nextArrival = processes.get(i).arrivalTime;
-                        }
-                    }
-                }
-                if (nextArrival != Integer.MAX_VALUE) {
-                    gantt.add("IDLE [" + currentTime + "-" + nextArrival + "]");
-                    currentTime = nextArrival;
-                } else {
-                    currentTime++;
-                }
+            if (next == null) {
+                int nextArrival = unfinished.stream()
+                        .mapToInt(Process::arrivalTime)
+                        .min()
+                        .orElseThrow();
+                timeline.add(new ExecutionSlice("IDLE", currentTime, nextArrival));
+                currentTime = nextArrival;
                 continue;
             }
 
-            // THAY ĐỔI Ở ĐÂY: Sắp xếp theo Burst Time ngắn nhất (SJF)
-            // Nếu trùng Burst Time thì xét ai đến trước (AT), nếu vẫn trùng thì xét tên (ID)
-            readyQueue.sort(
-                Comparator.comparingInt((Process p) -> p.burstTime)
-                          .thenComparingInt(p -> p.arrivalTime)
-                          .thenComparing(p -> p.id)
-            );
-
-            Process currentProcess = readyQueue.get(0);
-            int originalIndex = processes.indexOf(currentProcess);
-            
-            // Thời điểm bắt đầu chạy
-            currentProcess.startTime = currentTime;
-            // Chạy một mạch đến khi hoàn tất (không ngắt)
-            currentTime += currentProcess.burstTime;
-            
-            // Tính toán các chỉ số
-            currentProcess.completionTime = currentTime;
-            currentProcess.turnaroundTime = currentProcess.completionTime - currentProcess.arrivalTime;
-            currentProcess.waitingTime = currentProcess.turnaroundTime - currentProcess.burstTime;
-            
-            // Đánh dấu hoàn thành
-            isCompleted[originalIndex] = true;
-            completedCount++;
-
-            // Ghi nhận vào Gantt Chart
-            gantt.add(currentProcess.id + " [" + currentProcess.startTime + "-" + currentProcess.completionTime + "]");
+            int startTime = currentTime;
+            currentTime = Math.addExact(currentTime, next.burstTime());
+            timeline.add(new ExecutionSlice(next.id(), startTime, currentTime));
+            timings.add(new ProcessTiming(next.id(), startTime, currentTime));
+            unfinished.remove(next);
         }
 
-        // Hiển thị kết quả bảng thống kê
-        System.out.println("\nSJF SCHEDULING (NON-PREEMPTIVE)");
-        System.out.printf("%-8s %-8s %-8s %-8s %-8s %-8s %-8s%n",
-                "Process", "AT", "BT", "ST", "CT", "TAT", "WT");
-
-        double totalWT = 0;
-        double totalTAT = 0;
-
-        for (Process p : processes) {
-            System.out.printf("%-8s %-8d %-8d %-8d %-8d %-8d %-8d%n",
-                    p.id, p.arrivalTime, p.burstTime,
-                    p.startTime, p.completionTime,
-                    p.turnaroundTime, p.waitingTime);
-
-            totalWT += p.waitingTime;
-            totalTAT += p.turnaroundTime;
-        }
-
-        System.out.println("\nGantt Chart:");
-        System.out.println(String.join(" | ", gantt));
-
-        System.out.printf("%nAverage Waiting Time: %.2f%n", totalWT / n);
-        System.out.printf("Average Turnaround Time: %.2f%n", totalTAT / n);
+        return new Result(List.copyOf(timeline), List.copyOf(timings));
     }
 
-    private static int readInt(Scanner scanner, String prompt, int minimum) {
-        while (true) {
-            System.out.print(prompt);
-            if (!scanner.hasNext()) {
-                throw new IllegalStateException("Da het du lieu dau vao.");
+    private static void validate(List<Process> processes) {
+        if (processes == null || processes.isEmpty()) {
+            throw new IllegalArgumentException("SJF cần ít nhất một tiến trình.");
+        }
+        Set<String> ids = new HashSet<>();
+        for (Process process : processes) {
+            if (process == null || process.id() == null || process.id().isBlank()) {
+                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
             }
-            if (!scanner.hasNextInt()) {
-                scanner.next();
-                System.out.println("Vui long nhap mot so nguyen.");
-                continue;
+            if (!ids.add(process.id().trim())) {
+                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
             }
-            int value = scanner.nextInt();
-            if (value < minimum) {
-                System.out.printf("Gia tri phai lon hon hoac bang %d.%n", minimum);
-                continue;
+            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
+                throw new IllegalArgumentException("arrivalTime phải >= 0 và burstTime phải > 0.");
             }
-            return value;
         }
     }
 }
