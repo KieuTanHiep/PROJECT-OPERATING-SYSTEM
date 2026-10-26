@@ -1,121 +1,129 @@
-package Algorithm;
+package algorithm;
 
-import Model.Process;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.LinkedList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Queue;
+import java.util.Set;
 
-public class RoundRobin extends Scheduler {
-    private int quantum;
+public final class RoundRobin {
 
-    public RoundRobin(List<Process> processes, int quantum) {
-        super(processes);
-        this.quantum = quantum;
-    }
+    public record Process(String id, int arrivalTime, int burstTime) {}
 
-    @Override
-    public void calculate() {
-        int n = processes.size();
-        if (n == 0) return;
+    public record ExecutionSlice(String processId, int startTime, int endTime) {}
 
-        List<Process> sortedList = new ArrayList<>();
-        for (Process p : processes) {
-            sortedList.add(new Process(p));
-        }
-        sortedList.sort((p1, p2) -> Integer.compare(p1.getArrivalTime(), p2.getArrivalTime()));
+    public record ProcessTiming(String processId, int startTime, int completionTime) {}
 
-        int[] remainingBurstTime = new int[n];
-        for (int i = 0; i < n; i++) {
-            remainingBurstTime[i] = sortedList.get(i).getBurstTime();
-        }
+    public record Result(List<ExecutionSlice> timeline, List<ProcessTiming> processes) {}
 
-        Queue<Integer> queue = new LinkedList<>();
-        boolean[] inQueue = new boolean[n];
+    private static final Comparator<Process> ARRIVAL_ORDER =
+            Comparator.comparingInt(Process::arrivalTime).thenComparing(Process::id);
 
+    private RoundRobin() {}
+
+    public static Result schedule(List<Process> inputs, int quantum) {
+        validate(inputs, quantum);
+
+        List<SimProcess> processes = inputs.stream()
+                .sorted(ARRIVAL_ORDER)
+                .map(SimProcess::new)
+                .toList();
+        List<ExecutionSlice> timeline = new ArrayList<>();
+        ArrayDeque<SimProcess> readyQueue = new ArrayDeque<>();
+        int nextProcess = 0;
         int currentTime = 0;
         int completed = 0;
 
-        queue.add(0);
-        inQueue[0] = true;
-        currentTime = sortedList.get(0).getArrivalTime();
-
-        while (completed < n) {
-            if (queue.isEmpty()) {
-                for (int i = 0; i < n; i++) {
-                    if (remainingBurstTime[i] > 0) {
-                        queue.add(i);
-                        inQueue[i] = true;
-                        currentTime = Math.max(currentTime, sortedList.get(i).getArrivalTime());
-                        break;
-                    }
-                }
+        while (completed < processes.size()) {
+            while (nextProcess < processes.size()
+                    && processes.get(nextProcess).input.arrivalTime() <= currentTime) {
+                readyQueue.addLast(processes.get(nextProcess++));
             }
 
-            int index = queue.poll();
-            Process p = sortedList.get(index);
-
-            int executeTime = Math.min(remainingBurstTime[index], quantum);
-            
-            ganttChart.add(p.getName() + " (" + currentTime + " - " + (currentTime + executeTime) + ")");
-            
-            remainingBurstTime[index] -= executeTime;
-            currentTime += executeTime;
-
-            for (int i = 0; i < n; i++) {
-                if (i != index && remainingBurstTime[i] > 0 && !inQueue[i] 
-                        && sortedList.get(i).getArrivalTime() <= currentTime) {
-                    queue.add(i);
-                    inQueue[i] = true;
-                }
+            if (readyQueue.isEmpty()) {
+                int nextArrival = processes.get(nextProcess).input.arrivalTime();
+                addSlice(timeline, "IDLE", currentTime, nextArrival);
+                currentTime = nextArrival;
+                continue;
             }
 
-            if (remainingBurstTime[index] > 0) {
-                queue.add(index);
-            } else {
+            SimProcess running = readyQueue.removeFirst();
+            if (running.startTime < 0) {
+                running.startTime = currentTime;
+            }
+
+            int duration = Math.min(quantum, running.remainingTime);
+            int endTime = Math.addExact(currentTime, duration);
+            addSlice(timeline, running.input.id(), currentTime, endTime);
+            running.remainingTime -= duration;
+            currentTime = endTime;
+
+            while (nextProcess < processes.size()
+                    && processes.get(nextProcess).input.arrivalTime() <= currentTime) {
+                readyQueue.addLast(processes.get(nextProcess++));
+            }
+
+            if (running.remainingTime == 0) {
+                running.completionTime = currentTime;
                 completed++;
-                int completionTime = currentTime;
-                int turnaroundTime = completionTime - p.getArrivalTime();
-                int waitingTime = turnaroundTime - p.getBurstTime();
+            } else {
+                readyQueue.addLast(running);
+            }
+        }
 
-                p.setCompletionTime(completionTime);
-                p.setTurnaroundTime(turnaroundTime);
-                p.setWaitingTime(waitingTime);
+        List<ProcessTiming> timings = processes.stream()
+                .map(process -> new ProcessTiming(
+                        process.input.id(), process.startTime, process.completionTime))
+                .toList();
+        return new Result(List.copyOf(timeline), timings);
+    }
 
-                for (Process original : processes) {
-                    if (original.getName().equals(p.getName())) {
-                        original.setCompletionTime(completionTime);
-                        original.setTurnaroundTime(turnaroundTime);
-                        original.setWaitingTime(waitingTime);
-                        break;
-                    }
-                }
+    private static void addSlice(
+            List<ExecutionSlice> timeline, String processId, int startTime, int endTime) {
+        if (!timeline.isEmpty()) {
+            ExecutionSlice previous = timeline.get(timeline.size() - 1);
+            if (previous.processId().equals(processId) && previous.endTime() == startTime) {
+                timeline.set(timeline.size() - 1,
+                        new ExecutionSlice(processId, previous.startTime(), endTime));
+                return;
+            }
+        }
+        timeline.add(new ExecutionSlice(processId, startTime, endTime));
+    }
+
+    private static void validate(List<Process> processes, int quantum) {
+        if (processes == null || processes.isEmpty()) {
+            throw new IllegalArgumentException("Round Robin cần ít nhất một tiến trình.");
+        }
+        if (quantum <= 0) {
+            throw new IllegalArgumentException("Quantum phải lớn hơn 0.");
+        }
+
+        Set<String> ids = new HashSet<>();
+        for (Process process : processes) {
+            if (process == null || process.id() == null || process.id().isBlank()) {
+                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
+            }
+            if (!ids.add(process.id().trim())) {
+                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
+            }
+            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
+                throw new IllegalArgumentException(
+                        "arrivalTime phải >= 0 và burstTime phải > 0.");
             }
         }
     }
 
-    @Override
-    public void printProcesses() {
-        System.out.println("--- Round Robin Scheduling ---");
-        System.out.println("Process\tArrival\tBurst\tCompletion\tTurnaround\tWaiting");
-        for (Process p : processes) {
-            System.out.println(p.getName() + "\t" +
-                    p.getArrivalTime() + "\t" +
-                    p.getBurstTime() + "\t" +
-                    p.getCompletionTime() + "\t\t" +
-                    p.getTurnaroundTime() + "\t\t" +
-                    p.getWaitingTime());
-        }
-        System.out.printf("Average Waiting Time: %.2f\n", getAverageWaitingTime());
-        System.out.printf("Average Turnaround Time: %.2f\n", getAverageTurnaroundTime());
-    }
+    private static final class SimProcess {
+        private final Process input;
+        private int remainingTime;
+        private int startTime = -1;
+        private int completionTime = -1;
 
-    @Override
-    public void printGanttChart() {
-        System.out.println("\n--- Gantt Chart ---");
-        for (String slot : ganttChart) {
-            System.out.print("[" + slot + "] ");
+        private SimProcess(Process input) {
+            this.input = input;
+            remainingTime = input.burstTime();
         }
-        System.out.println();
     }
 }

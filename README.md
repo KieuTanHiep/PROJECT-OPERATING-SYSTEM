@@ -2,7 +2,7 @@
 
 # CPU Scheduling Algorithm Comparison
 
-Ứng dụng desktop Java Swing mô phỏng và so sánh năm thuật toán lập lịch CPU: FCFS, SJF, Priority không ngắt, SRTF và Round Robin. Chương trình hiển thị Gantt chart, kết quả từng tiến trình và các chỉ số tổng hợp; hỗ trợ nạp workload và xuất kết quả CSV.
+Ứng dụng desktop Java Swing mô phỏng và so sánh năm thuật toán lập lịch CPU: FCFS, SJF, Priority, SRTF và Round Robin. Chương trình hiển thị Gantt chart, kết quả từng tiến trình và các chỉ số tổng hợp; hỗ trợ nạp workload và xuất kết quả CSV.
 
 ## Cấu trúc dự án
 
@@ -29,7 +29,7 @@ Cần cài Java 21 và Maven. Từ thư mục gốc repository:
 cd Code
 mvn clean test
 mvn package
-java -cp target/classes GUI.SchedulingGUI
+java -cp target/classes gui.SchedulingGUI
 ```
 
 Hoặc chạy test mà không đổi thư mục hiện tại:
@@ -46,8 +46,6 @@ CSV đầu vào dùng UTF-8 và có header theo đúng thứ tự:
 
 ```csv
 processId,arrivalTime,burstTime,priority
-P1,0,7,3
-P2,2,4,1
 ```
 
 Mỗi `processId` phải duy nhất; `arrivalTime` là số nguyên không âm; `burstTime` là số nguyên dương. Priority nhỏ hơn nghĩa là ưu tiên cao hơn. Quantum là cấu hình Round Robin trên GUI, không phải cột trong CSV.
@@ -60,7 +58,7 @@ CSV kết quả gồm ba loại dòng: `TRACE` (các đoạn chạy và `IDLE`),
 
 - [SchedulingGUI.java](<./Code/src/main/java/GUI/SchedulingGUI.java>): giao diện desktop.
 - [CpuScheduler.java](<./Code/src/main/java/GUI/CpuScheduler.java>): kiểm tra dữ liệu, điều phối thuật toán và tổng hợp kết quả.
-- [Fcfs.java](<./Code/src/main/java/Algorithm/Fcfs.java>): thuật toán FCFS trong package riêng `Algorithm`.
+- [Fcfs.java](<./Code/src/main/java/Algorithm/>): các thuật toán trong package riêng `Algorithm`.
 - `Code/src/main/java/GUI/CsvScheduleFiles.java`: đọc workload và ghi kết quả CSV.
 - `Code/src/test/java/`: kiểm thử tự động cho thuật toán và CSV; chạy bằng `mvn test`.
 

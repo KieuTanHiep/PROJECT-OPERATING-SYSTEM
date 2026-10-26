@@ -69,6 +69,52 @@ class CpuSchedulerTest {
     }
 
     @Test
+    void roundRobinMapsProcessResultsAndEnqueuesBoundaryArrivalsBeforePreemptedProcess() {
+        var result = CpuScheduler.schedule(
+                List.of(
+                        new CpuScheduler.ProcessInput("P2", 0, 5, 1),
+                        new CpuScheduler.ProcessInput("P1", 0, 1, 1),
+                        new CpuScheduler.ProcessInput("P3", 3, 1, 1),
+                        new CpuScheduler.ProcessInput("P4", 10, 1, 1)),
+                CpuScheduler.Algorithm.ROUND_ROBIN,
+                2);
+
+        assertEquals(
+                List.of("P1 [0-1]", "P2 [1-3]", "P3 [3-4]", "P2 [4-7]",
+                        "IDLE [7-10]", "P4 [10-11]"),
+                describe(result.timeline()));
+
+        var processesById = result.processes().stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        process -> process.process().id(), process -> process));
+        assertEquals(0, processesById.get("P1").startTime());
+        assertEquals(1, processesById.get("P1").completionTime());
+        assertEquals(1, processesById.get("P1").turnaroundTime());
+        assertEquals(0, processesById.get("P1").waitingTime());
+        assertEquals(0, processesById.get("P1").responseTime());
+        assertEquals(1, processesById.get("P2").startTime());
+        assertEquals(7, processesById.get("P2").completionTime());
+        assertEquals(7, processesById.get("P2").turnaroundTime());
+        assertEquals(2, processesById.get("P2").waitingTime());
+        assertEquals(1, processesById.get("P2").responseTime());
+        assertEquals(3, processesById.get("P3").startTime());
+        assertEquals(4, processesById.get("P3").completionTime());
+        assertEquals(1, processesById.get("P3").turnaroundTime());
+        assertEquals(0, processesById.get("P3").waitingTime());
+        assertEquals(0, processesById.get("P3").responseTime());
+        assertEquals(10, processesById.get("P4").startTime());
+        assertEquals(11, processesById.get("P4").completionTime());
+        assertEquals(1, processesById.get("P4").turnaroundTime());
+        assertEquals(0, processesById.get("P4").waitingTime());
+        assertEquals(0, processesById.get("P4").responseTime());
+        assertEquals(0.5, result.averageWaitingTime(), 0.01);
+        assertEquals(2.5, result.averageTurnaroundTime(), 0.01);
+        assertEquals(0.25, result.averageResponseTime(), 0.01);
+        assertEquals(8.0 / 11.0, result.cpuUtilization(), 0.01);
+        assertEquals(4.0 / 11.0, result.throughput(), 0.01);
+    }
+
+    @Test
     void rejectsNonPositiveRoundRobinQuantum() throws IOException {
         assertThrows(
                 IllegalArgumentException.class,

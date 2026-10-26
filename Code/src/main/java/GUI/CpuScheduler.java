@@ -2,9 +2,9 @@ package gui;
 
 import algorithm.Fcfs;
 import algorithm.Priority;
+import algorithm.RoundRobin;
 import algorithm.Sjf;
 import algorithm.Srtf;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -55,10 +55,6 @@ public final class CpuScheduler {
             double averageResponseTime,
             double cpuUtilization,
             double throughput) {}
-
-    private static final Comparator<SimProcess> ARRIVAL_ORDER =
-            Comparator.comparingInt((SimProcess process) -> process.input.arrivalTime())
-                    .thenComparing(process -> process.input.id());
 
     private CpuScheduler() {}
 
@@ -161,7 +157,29 @@ public final class CpuScheduler {
                     process.remainingTime = 0;
                 }
             }
-            case ROUND_ROBIN -> runRoundRobin(processes, timeline, quantum);
+            case ROUND_ROBIN -> {
+                RoundRobin.Result result = RoundRobin.schedule(
+                        processes.stream()
+                                .map(process -> new RoundRobin.Process(
+                                        process.input.id(),
+                                        process.input.arrivalTime(),
+                                        process.input.burstTime()))
+                                .toList(),
+                        quantum);
+                Map<String, SimProcess> processesById = processes.stream()
+                        .collect(Collectors.toMap(
+                                process -> process.input.id(), Function.identity()));
+                for (RoundRobin.ExecutionSlice slice : result.timeline()) {
+                    timeline.add(new ExecutionSlice(
+                            slice.processId(), slice.startTime(), slice.endTime()));
+                }
+                for (RoundRobin.ProcessTiming timing : result.processes()) {
+                    SimProcess process = processesById.get(timing.processId());
+                    process.startTime = timing.startTime();
+                    process.completionTime = timing.completionTime();
+                    process.remainingTime = 0;
+                }
+            }
         }
 
         return createResult(processes, timeline);
@@ -196,52 +214,6 @@ public final class CpuScheduler {
             }
             if (input.burstTime() <= 0) {
                 throw new IllegalArgumentException("Thời gian chạy phải lớn hơn 0.");
-            }
-        }
-    }
-
-    private static void runRoundRobin(
-            List<SimProcess> processes, List<ExecutionSlice> timeline, int quantum) {
-        List<SimProcess> arrivalOrder = new ArrayList<>(processes);
-        arrivalOrder.sort(ARRIVAL_ORDER);
-        ArrayDeque<SimProcess> queue = new ArrayDeque<>();
-        int nextProcess = 0;
-        int currentTime = 0;
-        int completed = 0;
-
-        while (completed < processes.size()) {
-            while (nextProcess < arrivalOrder.size()
-                    && arrivalOrder.get(nextProcess).input.arrivalTime() <= currentTime) {
-                queue.addLast(arrivalOrder.get(nextProcess++));
-            }
-
-            if (queue.isEmpty()) {
-                int nextArrival = arrivalOrder.get(nextProcess).input.arrivalTime();
-                addSlice(timeline, "IDLE", currentTime, nextArrival);
-                currentTime = nextArrival;
-                continue;
-            }
-
-            SimProcess running = queue.removeFirst();
-            if (running.startTime < 0) {
-                running.startTime = currentTime;
-            }
-            int duration = Math.min(quantum, running.remainingTime);
-            int endTime = Math.addExact(currentTime, duration);
-            addSlice(timeline, running.input.id(), currentTime, endTime);
-            running.remainingTime -= duration;
-            currentTime = endTime;
-
-            while (nextProcess < arrivalOrder.size()
-                    && arrivalOrder.get(nextProcess).input.arrivalTime() <= currentTime) {
-                queue.addLast(arrivalOrder.get(nextProcess++));
-            }
-
-            if (running.remainingTime == 0) {
-                running.completionTime = currentTime;
-                completed++;
-            } else {
-                queue.addLast(running);
             }
         }
     }

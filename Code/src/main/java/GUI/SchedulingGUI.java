@@ -20,6 +20,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
@@ -90,8 +91,7 @@ public class SchedulingGUI extends JFrame {
         controls.add(exportButton);
 
         JButton addButton = new JButton("Thêm tiến trình");
-        addButton.addActionListener(event -> inputModel.addRow(
-                new Object[] {"P" + (inputModel.getRowCount() + 1), 0, 1, 1}));
+        addButton.addActionListener(event -> addProcess());
         controls.add(addButton);
 
         JButton removeButton = new JButton("Xóa dòng");
@@ -136,6 +136,56 @@ public class SchedulingGUI extends JFrame {
         int[] selectedRows = inputTable.getSelectedRows();
         for (int i = selectedRows.length - 1; i >= 0; i--) {
             inputModel.removeRow(selectedRows[i]);
+        }
+    }
+
+    private void addProcess() {
+        JTextField idField = new JTextField(12);
+        JTextField arrivalField = new JTextField(12);
+        JTextField burstField = new JTextField(12);
+        JTextField priorityField = new JTextField(12);
+        JPanel fields = new JPanel(new GridLayout(0, 2, 8, 6));
+        fields.add(new JLabel("Mã tiến trình:"));
+        fields.add(idField);
+        fields.add(new JLabel("Thời điểm đến:"));
+        fields.add(arrivalField);
+        fields.add(new JLabel("Thời gian chạy:"));
+        fields.add(burstField);
+        fields.add(new JLabel("Priority:"));
+        fields.add(priorityField);
+
+        if (JOptionPane.showConfirmDialog(
+                        this, fields, "Thêm tiến trình",
+                        JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE)
+                != JOptionPane.OK_OPTION) {
+            return;
+        }
+
+        try {
+            String id = idField.getText().trim();
+            if (id.isEmpty()) {
+                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
+            }
+            for (int row = 0; row < inputModel.getRowCount(); row++) {
+                if (cellText(row, 0).equals(id)) {
+                    throw new IllegalArgumentException("Mã tiến trình bị trùng: " + id);
+                }
+            }
+
+            int arrivalTime = parseInteger(arrivalField.getText(), "thời điểm đến");
+            int burstTime = parseInteger(burstField.getText(), "thời gian chạy");
+            int priority = parseInteger(priorityField.getText(), "priority");
+            if (arrivalTime < 0) {
+                throw new IllegalArgumentException("Thời điểm đến phải lớn hơn hoặc bằng 0.");
+            }
+            if (burstTime <= 0) {
+                throw new IllegalArgumentException("Thời gian chạy phải lớn hơn 0.");
+            }
+
+            inputModel.addRow(new Object[] {id, arrivalTime, burstTime, priority});
+        } catch (IllegalArgumentException exception) {
+            JOptionPane.showMessageDialog(
+                    this, exception.getMessage(), "Dữ liệu không hợp lệ", JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -235,12 +285,21 @@ public class SchedulingGUI extends JFrame {
     }
 
     private int parseInteger(int row, int column, String label) {
-        String value = cellText(row, column);
+        return parseInteger(cellText(row, column), label, row + 1);
+    }
+
+    private int parseInteger(String rawValue, String label) {
+        return parseInteger(rawValue, label, null);
+    }
+
+    private int parseInteger(String rawValue, String label, Integer rowNumber) {
+        String value = rawValue == null ? "" : rawValue.trim();
         try {
             return Integer.parseInt(value);
         } catch (NumberFormatException exception) {
+            String rowPrefix = rowNumber == null ? "" : "Dòng " + rowNumber + ": ";
             throw new IllegalArgumentException(
-                    "Dòng " + (row + 1) + ": " + label + " phải là số nguyên.");
+                    rowPrefix + label + " phải là số nguyên.");
         }
     }
 
