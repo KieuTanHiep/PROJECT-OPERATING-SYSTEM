@@ -58,7 +58,7 @@ CSV kết quả gồm ba loại dòng: `TRACE` (các đoạn chạy và `IDLE`),
 
 - [SchedulingGUI.java](<./Code/src/main/java/GUI/SchedulingGUI.java>): giao diện desktop.
 - [CpuScheduler.java](<./Code/src/main/java/GUI/CpuScheduler.java>): kiểm tra dữ liệu, điều phối thuật toán và tổng hợp kết quả.
-- `/Code/src/main/java/Algorithm/`: 5 thuật toán trong package riêng `Algorithm`.
+- `Code/src/main/java/Algorithm/`: 5 thuật toán trong package riêng `Algorithm`.
 - `Code/src/main/java/GUI/CsvScheduleFiles.java`: đọc workload và ghi kết quả CSV.
 - `Code/src/test/java/`: kiểm thử tự động cho thuật toán và CSV; chạy bằng `mvn test`.
 
