@@ -2,9 +2,7 @@ package algorithm;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public final class Fcfs {
 
@@ -23,19 +21,25 @@ public final class Fcfs {
 
     public static Result schedule(List<Process> inputs) {
         validate(inputs);
-        List<Process> processes = inputs.stream().sorted(ARRIVAL_ORDER).toList();
+        List<Process> processes = inputs.stream()
+                .map(process -> new Process(SchedulingSupport.normalizeProcessId(process.id()),
+                        process.arrivalTime(), process.burstTime()))
+                .sorted(ARRIVAL_ORDER).toList();
         List<ExecutionSlice> timeline = new ArrayList<>();
         List<ProcessTiming> timings = new ArrayList<>();
         int currentTime = 0;
 
         for (Process process : processes) {
+            SchedulingSupport.checkCancelled();
             if (currentTime < process.arrivalTime()) {
-                timeline.add(new ExecutionSlice("IDLE", currentTime, process.arrivalTime()));
+                SchedulingSupport.checkTraceCapacity(timeline.size());
+                timeline.add(new ExecutionSlice(SchedulingSupport.IDLE_LABEL, currentTime, process.arrivalTime()));
                 currentTime = process.arrivalTime();
             }
 
             int startTime = currentTime;
             currentTime = Math.addExact(currentTime, process.burstTime());
+            SchedulingSupport.checkTraceCapacity(timeline.size());
             timeline.add(new ExecutionSlice(process.id(), startTime, currentTime));
             timings.add(new ProcessTiming(process.id(), startTime, currentTime));
         }
@@ -43,20 +47,7 @@ public final class Fcfs {
     }
 
     private static void validate(List<Process> processes) {
-        if (processes == null || processes.isEmpty()) {
-            throw new IllegalArgumentException("FCFS cần ít nhất một tiến trình.");
-        }
-        Set<String> ids = new HashSet<>();
-        for (Process process : processes) {
-            if (process == null || process.id() == null || process.id().isBlank()) {
-                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
-            }
-            if (!ids.add(process.id().trim())) {
-                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
-            }
-            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
-                throw new IllegalArgumentException("arrivalTime phải >= 0 và burstTime phải > 0.");
-            }
-        }
+        SchedulingSupport.validateWorkload(
+                processes, Process::id, Process::arrivalTime, Process::burstTime, "FCFS");
     }
 }

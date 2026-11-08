@@ -3,14 +3,13 @@ package gui;
 import algorithm.Fcfs;
 import algorithm.Priority;
 import algorithm.RoundRobin;
+import algorithm.SchedulingSupport;
 import algorithm.Sjf;
 import algorithm.Srtf;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
-import java.util.Map;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -56,139 +55,43 @@ public final class CpuScheduler {
             double cpuUtilization,
             double throughput) {}
 
+    /** Jain's index is calculated on burst / turnaround (inverse slowdown), not raw waiting. */
+    public record ComparisonResult(
+            Algorithm algorithm,
+            ScheduleResult result,
+            double maximumWaitingTime,
+            double waitingTimeStdDev,
+            double jainFairnessIndex) {}
+
     private CpuScheduler() {}
 
     public static ScheduleResult schedule(
             List<ProcessInput> inputs, Algorithm algorithm, int quantum) {
-        validate(inputs, algorithm, quantum);
-
-        List<SimProcess> processes = new ArrayList<>();
-        for (ProcessInput input : inputs) {
-            processes.add(new SimProcess(input));
-        }
-
-        List<ExecutionSlice> timeline = new ArrayList<>();
-        switch (algorithm) {
-            case FCFS -> {
-                Fcfs.Result result = Fcfs.schedule(
-                        processes.stream()
-                                .map(process -> new Fcfs.Process(
-                                        process.input.id(),
-                                        process.input.arrivalTime(),
-                                        process.input.burstTime()))
-                                .toList());
-                Map<String, SimProcess> processesById = processes.stream()
-                        .collect(Collectors.toMap(
-                                process -> process.input.id(), Function.identity()));
-                for (Fcfs.ExecutionSlice slice : result.timeline()) {
-                    timeline.add(new ExecutionSlice(slice.processId(), slice.startTime(), slice.endTime()));
-                }
-                for (Fcfs.ProcessTiming timing : result.processes()) {
-                    SimProcess process = processesById.get(timing.processId());
-                    process.startTime = timing.startTime();
-                    process.completionTime = timing.completionTime();
-                    process.remainingTime = 0;
-                }
-            }
-            case SJF -> {
-                Sjf.Result result = Sjf.schedule(
-                        processes.stream()
-                                .map(process -> new Sjf.Process(
-                                        process.input.id(),
-                                        process.input.arrivalTime(),
-                                        process.input.burstTime()))
-                                .toList());
-                Map<String, SimProcess> processesById = processes.stream()
-                        .collect(Collectors.toMap(
-                                process -> process.input.id(), Function.identity()));
-                for (Sjf.ExecutionSlice slice : result.timeline()) {
-                    timeline.add(new ExecutionSlice(
-                            slice.processId(), slice.startTime(), slice.endTime()));
-                }
-                for (Sjf.ProcessTiming timing : result.processes()) {
-                    SimProcess process = processesById.get(timing.processId());
-                    process.startTime = timing.startTime();
-                    process.completionTime = timing.completionTime();
-                    process.remainingTime = 0;
-                }
-            }
-            case PRIORITY -> {
-                Priority.Result result = Priority.schedule(
-                        processes.stream()
-                                .map(process -> new Priority.Process(
-                                        process.input.id(),
-                                        process.input.arrivalTime(),
-                                        process.input.burstTime(),
-                                        process.input.priority()))
-                                .toList());
-                Map<String, SimProcess> processesById = processes.stream()
-                        .collect(Collectors.toMap(
-                                process -> process.input.id(), Function.identity()));
-                for (Priority.ExecutionSlice slice : result.timeline()) {
-                    timeline.add(new ExecutionSlice(
-                            slice.processId(), slice.startTime(), slice.endTime()));
-                }
-                for (Priority.ProcessTiming timing : result.processes()) {
-                    SimProcess process = processesById.get(timing.processId());
-                    process.startTime = timing.startTime();
-                    process.completionTime = timing.completionTime();
-                    process.remainingTime = 0;
-                }
-            }
-            case SRTF -> {
-                Srtf.Result result = Srtf.schedule(
-                        processes.stream()
-                                .map(process -> new Srtf.Process(
-                                        process.input.id(),
-                                        process.input.arrivalTime(),
-                                        process.input.burstTime()))
-                                .toList());
-                Map<String, SimProcess> processesById = processes.stream()
-                        .collect(Collectors.toMap(
-                                process -> process.input.id(), Function.identity()));
-                for (Srtf.ExecutionSlice slice : result.timeline()) {
-                    timeline.add(new ExecutionSlice(
-                            slice.processId(), slice.startTime(), slice.endTime()));
-                }
-                for (Srtf.ProcessTiming timing : result.processes()) {
-                    SimProcess process = processesById.get(timing.processId());
-                    process.startTime = timing.startTime();
-                    process.completionTime = timing.completionTime();
-                    process.remainingTime = 0;
-                }
-            }
-            case ROUND_ROBIN -> {
-                RoundRobin.Result result = RoundRobin.schedule(
-                        processes.stream()
-                                .map(process -> new RoundRobin.Process(
-                                        process.input.id(),
-                                        process.input.arrivalTime(),
-                                        process.input.burstTime()))
-                                .toList(),
-                        quantum);
-                Map<String, SimProcess> processesById = processes.stream()
-                        .collect(Collectors.toMap(
-                                process -> process.input.id(), Function.identity()));
-                for (RoundRobin.ExecutionSlice slice : result.timeline()) {
-                    timeline.add(new ExecutionSlice(
-                            slice.processId(), slice.startTime(), slice.endTime()));
-                }
-                for (RoundRobin.ProcessTiming timing : result.processes()) {
-                    SimProcess process = processesById.get(timing.processId());
-                    process.startTime = timing.startTime();
-                    process.completionTime = timing.completionTime();
-                    process.remainingTime = 0;
-                }
-            }
-        }
-
-        return createResult(processes, timeline);
+        List<ProcessInput> normalizedInputs = validate(inputs, algorithm, quantum);
+        EngineResult execution = switch (algorithm) {
+            case FCFS -> scheduleFcfs(normalizedInputs);
+            case SJF -> scheduleSjf(normalizedInputs);
+            case SRTF -> scheduleSrtf(normalizedInputs);
+            case PRIORITY -> schedulePriority(normalizedInputs);
+            case ROUND_ROBIN -> scheduleRoundRobin(normalizedInputs, quantum);
+        };
+        return createResult(normalizedInputs, execution);
     }
 
-    private static void validate(List<ProcessInput> inputs, Algorithm algorithm, int quantum) {
-        if (inputs == null || inputs.isEmpty()) {
-            throw new IllegalArgumentException("Hãy nhập ít nhất một tiến trình.");
+    /** Runs every algorithm against an immutable snapshot of the same workload. */
+    public static List<ComparisonResult> compare(List<ProcessInput> inputs, int quantum) {
+        List<ProcessInput> snapshot = validate(inputs, Algorithm.ROUND_ROBIN, quantum);
+        List<ComparisonResult> comparisons = new ArrayList<>();
+        for (Algorithm algorithm : Algorithm.values()) {
+            SchedulingSupport.checkCancelled();
+            ScheduleResult result = schedule(snapshot, algorithm, quantum);
+            comparisons.add(summarizeComparison(algorithm, result));
         }
+        return List.copyOf(comparisons);
+    }
+
+    private static List<ProcessInput> validate(
+            List<ProcessInput> inputs, Algorithm algorithm, int quantum) {
         if (algorithm == null) {
             throw new IllegalArgumentException("Hãy chọn thuật toán lập lịch.");
         }
@@ -196,75 +99,108 @@ public final class CpuScheduler {
             throw new IllegalArgumentException("Quantum phải lớn hơn 0.");
         }
 
-        Set<String> ids = new HashSet<>();
-        for (int i = 0; i < inputs.size(); i++) {
-            ProcessInput input = inputs.get(i);
-            if (input == null) {
-                throw new IllegalArgumentException("Tiến trình ở dòng " + (i + 1) + " không hợp lệ.");
-            }
-            String id = input.id() == null ? "" : input.id().trim();
-            if (id.isEmpty()) {
-                throw new IllegalArgumentException("Mã tiến trình ở dòng " + (i + 1) + " không được để trống.");
-            }
-            if (!ids.add(id)) {
-                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + id);
-            }
-            if (input.arrivalTime() < 0) {
-                throw new IllegalArgumentException("Thời điểm đến phải lớn hơn hoặc bằng 0.");
-            }
-            if (input.burstTime() <= 0) {
-                throw new IllegalArgumentException("Thời gian chạy phải lớn hơn 0.");
-            }
-        }
+        SchedulingSupport.validateWorkload(inputs, ProcessInput::id,
+                ProcessInput::arrivalTime, ProcessInput::burstTime, "Bộ lập lịch");
+        return inputs.stream()
+                .map(input -> new ProcessInput(SchedulingSupport.normalizeProcessId(input.id()),
+                        input.arrivalTime(), input.burstTime(), input.priority()))
+                .toList();
     }
 
-    static void addSlice(
-            List<ExecutionSlice> timeline, String processId, int startTime, int endTime) {
-        if (startTime == endTime) {
-            return;
-        }
-        if (!timeline.isEmpty()) {
-            ExecutionSlice previous = timeline.get(timeline.size() - 1);
-            if (previous.processId().equals(processId) && previous.endTime() == startTime) {
-                timeline.set(
-                        timeline.size() - 1,
-                        new ExecutionSlice(processId, previous.startTime(), endTime));
-                return;
-            }
-        }
-        timeline.add(new ExecutionSlice(processId, startTime, endTime));
+    private static EngineResult scheduleFcfs(List<ProcessInput> inputs) {
+        Fcfs.Result result = Fcfs.schedule(inputs.stream()
+                .map(input -> new Fcfs.Process(input.id(), input.arrivalTime(), input.burstTime()))
+                .toList());
+        return new EngineResult(
+                result.timeline().stream().map(slice -> executionSlice(
+                        slice.processId(), slice.startTime(), slice.endTime())).toList(),
+                result.processes().stream().map(timing -> processTiming(
+                        timing.processId(), timing.startTime(), timing.completionTime())).toList());
     }
 
-    private static ScheduleResult createResult(
-            List<SimProcess> processes, List<ExecutionSlice> timeline) {
+    private static EngineResult scheduleSjf(List<ProcessInput> inputs) {
+        Sjf.Result result = Sjf.schedule(inputs.stream()
+                .map(input -> new Sjf.Process(input.id(), input.arrivalTime(), input.burstTime()))
+                .toList());
+        return new EngineResult(
+                result.timeline().stream().map(slice -> executionSlice(
+                        slice.processId(), slice.startTime(), slice.endTime())).toList(),
+                result.processes().stream().map(timing -> processTiming(
+                        timing.processId(), timing.startTime(), timing.completionTime())).toList());
+    }
+
+    private static EngineResult scheduleSrtf(List<ProcessInput> inputs) {
+        Srtf.Result result = Srtf.schedule(inputs.stream()
+                .map(input -> new Srtf.Process(input.id(), input.arrivalTime(), input.burstTime()))
+                .toList());
+        return new EngineResult(
+                result.timeline().stream().map(slice -> executionSlice(
+                        slice.processId(), slice.startTime(), slice.endTime())).toList(),
+                result.processes().stream().map(timing -> processTiming(
+                        timing.processId(), timing.startTime(), timing.completionTime())).toList());
+    }
+
+    private static EngineResult schedulePriority(List<ProcessInput> inputs) {
+        Priority.Result result = Priority.schedule(inputs.stream()
+                .map(input -> new Priority.Process(
+                        input.id(), input.arrivalTime(), input.burstTime(), input.priority()))
+                .toList());
+        return new EngineResult(
+                result.timeline().stream().map(slice -> executionSlice(
+                        slice.processId(), slice.startTime(), slice.endTime())).toList(),
+                result.processes().stream().map(timing -> processTiming(
+                        timing.processId(), timing.startTime(), timing.completionTime())).toList());
+    }
+
+    private static EngineResult scheduleRoundRobin(List<ProcessInput> inputs, int quantum) {
+        RoundRobin.Result result = RoundRobin.schedule(inputs.stream()
+                .map(input -> new RoundRobin.Process(input.id(), input.arrivalTime(), input.burstTime()))
+                .toList(), quantum);
+        return new EngineResult(
+                result.timeline().stream().map(slice -> executionSlice(
+                        slice.processId(), slice.startTime(), slice.endTime())).toList(),
+                result.processes().stream().map(timing -> processTiming(
+                        timing.processId(), timing.startTime(), timing.completionTime())).toList());
+    }
+
+    private static ExecutionSlice executionSlice(String processId, int startTime, int endTime) {
+        SchedulingSupport.checkCancelled();
+        return new ExecutionSlice(processId, startTime, endTime);
+    }
+
+    private static ProcessTiming processTiming(String processId, int startTime, int completionTime) {
+        SchedulingSupport.checkCancelled();
+        return new ProcessTiming(processId, startTime, completionTime);
+    }
+
+    private static ScheduleResult createResult(List<ProcessInput> inputs, EngineResult execution) {
+        Map<String, ProcessTiming> timingsById = execution.timings().stream()
+                .collect(Collectors.toMap(ProcessTiming::processId, Function.identity()));
         List<ProcessResult> results = new ArrayList<>();
         double totalWaitingTime = 0;
         double totalTurnaroundTime = 0;
         double totalResponseTime = 0;
-        int totalBurstTime = 0;
+        long totalBurstTime = 0;
 
-        for (SimProcess process : processes) {
-            int turnaroundTime = process.completionTime - process.input.arrivalTime();
-            int waitingTime = turnaroundTime - process.input.burstTime();
-            int responseTime = process.startTime - process.input.arrivalTime();
-            results.add(new ProcessResult(
-                    process.input,
-                    process.startTime,
-                    process.completionTime,
-                    turnaroundTime,
-                    waitingTime,
-                    responseTime));
+        for (ProcessInput input : inputs) {
+            SchedulingSupport.checkCancelled();
+            ProcessTiming timing = timingsById.get(input.id());
+            int turnaroundTime = timing.completionTime() - input.arrivalTime();
+            int waitingTime = turnaroundTime - input.burstTime();
+            int responseTime = timing.startTime() - input.arrivalTime();
+            results.add(new ProcessResult(input, timing.startTime(), timing.completionTime(),
+                    turnaroundTime, waitingTime, responseTime));
             totalWaitingTime += waitingTime;
             totalTurnaroundTime += turnaroundTime;
             totalResponseTime += responseTime;
-            totalBurstTime = Math.addExact(totalBurstTime, process.input.burstTime());
+            totalBurstTime += input.burstTime();
         }
 
-        results.sort(Comparator.comparing(ProcessResult::process, Comparator.comparing(ProcessInput::id)));
-        int endTime = timeline.get(timeline.size() - 1).endTime();
-        double processCount = processes.size();
+        results.sort(Comparator.comparing(result -> result.process().id()));
+        int endTime = execution.timeline().getLast().endTime();
+        double processCount = inputs.size();
         return new ScheduleResult(
-                List.copyOf(timeline),
+                List.copyOf(execution.timeline()),
                 List.copyOf(results),
                 totalWaitingTime / processCount,
                 totalTurnaroundTime / processCount,
@@ -273,15 +209,28 @@ public final class CpuScheduler {
                 processCount / endTime);
     }
 
-    static final class SimProcess {
-        final ProcessInput input;
-        int remainingTime;
-        int startTime = -1;
-        int completionTime = -1;
-
-        SimProcess(ProcessInput input) {
-            this.input = input;
-            remainingTime = input.burstTime();
+    private static ComparisonResult summarizeComparison(Algorithm algorithm, ScheduleResult result) {
+        double maxWaiting = 0;
+        double squaredWaitingDifferences = 0;
+        double serviceScoreSum = 0;
+        double squaredServiceScoreSum = 0;
+        for (ProcessResult process : result.processes()) {
+            SchedulingSupport.checkCancelled();
+            maxWaiting = Math.max(maxWaiting, process.waitingTime());
+            double difference = process.waitingTime() - result.averageWaitingTime();
+            squaredWaitingDifferences += difference * difference;
+            double serviceScore = (double) process.process().burstTime() / process.turnaroundTime();
+            serviceScoreSum += serviceScore;
+            squaredServiceScoreSum += serviceScore * serviceScore;
         }
+        int count = result.processes().size();
+        double fairness = serviceScoreSum * serviceScoreSum / (count * squaredServiceScoreSum);
+        return new ComparisonResult(
+                algorithm, result, maxWaiting,
+                Math.sqrt(squaredWaitingDifferences / count), Math.min(1.0, fairness));
     }
+
+    private record ProcessTiming(String processId, int startTime, int completionTime) {}
+
+    private record EngineResult(List<ExecutionSlice> timeline, List<ProcessTiming> timings) {}
 }

@@ -1,0 +1,7 @@
+processId,arrivalTime,burstTime,priority
+Long,0,30,5
+Short1,0,2,1
+Short2,1,2,1
+Short3,2,2,1
+Short4,3,2,1
+Short5,4,2,1

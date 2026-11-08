@@ -1,18 +1,27 @@
-Mã test,Nhóm kiểm thử,Mục tiêu,Cách thực hiện,Kết quả mong đợi
-CSV-01,Dữ liệu đầu vào,Đọc workload mẫu,Nạp input/data.csv trên giao diện,Đọc đủ 5 tiến trình; không thêm trùng hoặc mất dòng
-CSV-02,Dữ liệu đầu vào,Từ chối processId trùng,Nạp CSV có hai tiến trình trùng processId,Báo lỗi rõ dòng bị lỗi; không thay đổi danh sách đang có
-CSV-03,Dữ liệu đầu vào,Từ chối thời gian không hợp lệ,"Thử arrivalTime âm, burstTime bằng 0 hoặc giá trị không phải số nguyên",Báo lỗi rõ cột/dòng; ứng dụng không bị dừng
-CSV-04,Dữ liệu đầu vào,Từ chối CSV sai cấu trúc,"Thử file rỗng, thiếu header, sai tên header hoặc dòng không đủ 4 cột",Hiện thông báo lỗi định dạng CSV; không nạp một phần dữ liệu
-ALG-01,FCFS,Kiểm tra thứ tự đến và khoảng CPU rỗi,Chạy input/data.csv với FCFS,Tiến trình chạy theo arrivalTime; có IDLE từ 15 đến 20
-ALG-02,SJF,Chọn burst ngắn nhất trong hàng đợi,Chạy input/data.csv với SJF,"Sau P1, chọn tiến trình sẵn sàng có burstTime ngắn nhất"
-ALG-03,SRTF,Kiểm tra ngắt tiến trình,Chạy input/data.csv với SRTF,"P1 bị ngắt khi tiến trình ngắn hơn đến; trace thể hiện đúng các mốc thời gian"
-ALG-04,Priority,Chọn mức ưu tiên cao nhất,Chạy input/data.csv với Priority,"Trong các tiến trình sẵn sàng, số priority nhỏ hơn được chạy trước"
-ALG-05,Round Robin,Kiểm tra hàng đợi và quantum,Chạy input/data.csv với Round Robin; quantum = 2,"Mỗi lượt chạy tối đa 2 đơn vị; tiến trình chưa xong quay lại cuối hàng đợi"
-ALG-06,Round Robin,Từ chối quantum không hợp lệ,Chạy Round Robin với quantum bằng 0,Hiện thông báo quantum phải lớn hơn 0
-OUT-01,Kết quả,Kiểm tra Gantt chart và bảng chỉ số,Chạy từng thuật toán với workload mẫu,"Hiện timeline, completionTime, turnaroundTime, waitingTime và responseTime"
-OUT-02,Kết quả CSV,Kiểm tra xuất kết quả,Chạy mô phỏng rồi chọn Xuất kết quả CSV,"File có các dòng TRACE, PROCESS và SUMMARY; mở được bằng bảng tính"
-OUT-03,Kết quả CSV,Không xuất kết quả cũ sau khi sửa input,"Chạy mô phỏng, sửa hoặc nạp lại danh sách tiến trình rồi thử xuất","Kết quả cũ bị vô hiệu hóa; yêu cầu chạy mô phỏng lại"
-EDGE-01,Biên,Kiểm tra workload rỗng,Xóa hết tiến trình rồi chạy mô phỏng,"Hiện thông báo cần ít nhất một tiến trình; giao diện vẫn hoạt động"
-EDGE-02,Biên,Kiểm tra CPU rỗi trước tiến trình đầu tiên,Dùng workload có arrivalTime đầu tiên lớn hơn 0,"Trace có khoảng IDLE từ thời điểm 0 đến arrivalTime đầu tiên"
-PERF-01,Hiệu năng,Đo thời gian với workload lớn,"Chạy mỗi thuật toán với 100, 500 và 1000 tiến trình; lặp lại sau một lần làm nóng","Ghi thời gian chạy, cấu hình máy và kích thước input; không bỏ sót tiến trình"
-PERF-02,Hiệu năng,Tổng hợp và nhận xét độ phức tạp,Lấy trung vị các lần đo cho từng kích thước và thuật toán,"Báo cáo số liệu và nhận xét xu hướng; không chỉ đưa ảnh chụp"
+Mã test,Hình thức,Mục tiêu,Cách chạy,Bằng chứng hoặc kết quả mong đợi
+CSV-01,Tự động,Đọc CSV UTF-8 và quoted processId,mvn test,CsvScheduleFilesTest; đọc đúng trường dữ liệu
+CSV-02,Tự động,Từ chối ID trùng và IDLE dành riêng,mvn test,CsvValidationTest và AlgorithmEdgeCasesTest; báo lỗi thay vì xuất trace nhập nhằng
+CSV-03,Tự động,Từ chối số sai và thời gian không hợp lệ,mvn test,CsvValidationTest và CpuSchedulerComparisonTest; ứng dụng không nhận workload lỗi
+CSV-04,Tự động,Từ chối CSV rỗng và sai cấu trúc,mvn test,CsvValidationTest; không chấp nhận dữ liệu thiếu header hoặc cột
+CSV-05,Tự động,Ghi đè nguyên vẹn và hủy xuất giữ tệp cũ,mvn test,CsvValidationTest; không để lại tệp tạm hoặc làm mất kết quả trước
+ALG-01,Tự động,Đối chiếu timeline và chỉ số 5 thuật toán,mvn test,CpuSchedulerTest và SchedulerOracleTest; khớp kết quả tính tay và oracle
+ALG-02,Tự động,Tie-break và CPU idle đầu phiên,mvn test,AlgorithmEdgeCasesTest và SchedulerOracleTest; thứ tự và mốc idle đúng quy ước
+ALG-03,Tự động,SRTF ngắt và giữ tiến trình khi hòa remaining,mvn test,AlgorithmEdgeCasesTest và SchedulerOracleTest; timeline khớp oracle
+ALG-04,Tự động,RR xử lý arrival ở ranh giới quantum,mvn test,CpuSchedulerTest và SchedulerOracleTest; arrival trước tiến trình vừa bị ngắt
+ALG-05,Tự động,Giới hạn thời gian và burst lớn,mvn test,AlgorithmEdgeCasesTest; không tràn int hoặc lặp từng tick với SRTF
+ORACLE-01,Tự động,300 workload ngẫu nhiên seed cố định và 5 thuật toán,mvn test,SchedulerOracleTest; khớp toàn timeline và ST/CT/TAT/WT/RT cùng 5 chỉ số
+VERIFY-01,Tự động,Lưu expected và actual có thể tái lập,java -cp target/classes tools.SchedulerVerification check output,output/correctness-results.csv và correctness-environment.txt; exit code khác 0 nếu FAIL
+OUT-01,Tự động,Xuất trace và bảng chỉ số CSV,mvn test,CsvScheduleFilesTest và CsvValidationTest; đủ TRACE/PROCESS/SUMMARY và đúng thông tin idle/quoted ID
+OUT-02,Tự động,Gantt tỷ lệ và trace lớn,mvn test,GanttChartPanelTest; tooltip chính xác với idle và thời gian int lớn; vẽ được 200000 đoạn
+COMPARE-02,Tự động,Công thức fairness và snapshot dữ liệu,mvn test,CpuSchedulerComparisonTest; max WT/stddev/Jain khớp giá trị tính tay và không đổi input
+COMPARE-01,Tự động,So sánh cả 5 thuật toán cùng workload,java -cp target/classes tools.SchedulerVerification check output,output/comparisons/*-summary.csv và *-details.csv; có WT/TAT/RT/throughput và fairness
+PERF-01,Tự động,Đo 100/500/1000 tiến trình và nhiều burst,java -cp target/classes tools.SchedulerVerification benchmark output,output/benchmark-raw.csv; 3 warmup và 7 lần đo mỗi cấu hình; sinh input chính xác
+PERF-02,Tự động,Trung vị và thông tin môi trường đo,java -cp target/classes tools.SchedulerVerification benchmark output,output/benchmark-summary.csv và benchmark-environment.txt; không dùng ngưỡng thời gian cứng
+STRESS-01,Tự động,Bảo toàn CPU burst và công thức chỉ số trên workload lớn,java -cp target/classes tools.SchedulerVerification benchmark output,output/benchmark-raw.csv; tất cả measured run phải qua bất biến
+GUI-SMOKE,Tự động desktop,Luồng nền chọn kết quả hủy và chạy lại,java -cp target/classes tests/GuiSmokeProbe.java,output/gui-smoke.txt và gui-detail.png/gui-comparison.png; không xác nhận hộp thoại thủ công
+GUI-01,Thủ công,Nạp CSV sửa và xóa tiến trình,Chạy GUI rồi nạp input/data.csv và sửa dữ liệu,Danh sách thay thế toàn bộ khi nạp hợp lệ; dữ liệu lỗi không nạp một phần; cần ghi kết quả thao tác thực tế
+GUI-02,Thủ công,Gantt đúng tỷ lệ và bảng chi tiết,Chạy từng thuật toán với input/initial-idle.csv,Có idle và các mốc thời gian đúng; biểu đồ cuộn được; cần ghi kết quả thao tác thực tế
+GUI-03,Thủ công,Tác vụ nền và hủy không làm đứng giao diện,Chạy workload lớn hoặc quantum nhỏ rồi hủy,Giao diện phản hồi và trở về trạng thái có thể chạy lại; cần ghi kết quả thao tác thực tế
+GUI-04,Thủ công,Vô hiệu hóa kết quả cũ khi sửa input hoặc cấu hình,Chạy rồi sửa bảng hoặc đổi thuật toán/quantum,Yêu cầu chạy lại trước khi xuất; không xuất kết quả với cấu hình mới chưa chạy
+GUI-05,Thủ công,So sánh và xem chi tiết từng thuật toán,Nạp input/fairness.csv rồi chạy so sánh,Có đủ 5 dòng; chọn dòng đổi Gantt và bảng chi tiết tương ứng
+GUI-06,Thủ công,Nhập quantum và ghi đè tệp,Nhập quantum mới trực tiếp rồi chạy và xuất vào tệp có sẵn,Giá trị nhập được commit trước khi chạy; xác nhận trước khi ghi đè; cần ghi kết quả thao tác thực tế

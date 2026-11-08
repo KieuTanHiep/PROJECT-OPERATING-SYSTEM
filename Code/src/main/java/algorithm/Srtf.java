@@ -2,9 +2,8 @@ package algorithm;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
+import java.util.PriorityQueue;
 
 public final class Srtf {
 
@@ -21,54 +20,61 @@ public final class Srtf {
                     .thenComparingInt(process -> process.input.arrivalTime())
                     .thenComparing(process -> process.input.id());
 
+    private static final Comparator<SimProcess> ARRIVAL_ORDER =
+            Comparator.comparingInt((SimProcess process) -> process.input.arrivalTime())
+                    .thenComparing(process -> process.input.id());
+
     private Srtf() {}
 
     public static Result schedule(List<Process> inputs) {
         validate(inputs);
-        List<SimProcess> processes = inputs.stream().map(SimProcess::new).toList();
+        List<SimProcess> processes = inputs.stream()
+                .map(process -> new Process(SchedulingSupport.normalizeProcessId(process.id()),
+                        process.arrivalTime(), process.burstTime()))
+                .map(SimProcess::new).toList();
+        List<SimProcess> arrivals = processes.stream().sorted(ARRIVAL_ORDER).toList();
+        PriorityQueue<SimProcess> ready = new PriorityQueue<>(REMAINING_TIME_ORDER);
         List<ExecutionSlice> timeline = new ArrayList<>();
         int currentTime = 0;
+        int nextArrival = 0;
         int completed = 0;
         SimProcess running = null;
 
         while (completed < processes.size()) {
-            int schedulingTime = currentTime;
-            SimProcess previous = running;
-            SimProcess best = processes.stream()
-                    .filter(process -> process.remainingTime > 0)
-                    .filter(process -> process.input.arrivalTime() <= schedulingTime)
-                    .min(REMAINING_TIME_ORDER)
-                    .orElse(null);
+            SchedulingSupport.checkCancelled();
+            if (running == null && ready.isEmpty()
+                    && currentTime < arrivals.get(nextArrival).input.arrivalTime()) {
+                int arrivalTime = arrivals.get(nextArrival).input.arrivalTime();
+                addSlice(timeline, SchedulingSupport.IDLE_LABEL, currentTime, arrivalTime);
+                currentTime = arrivalTime;
+            }
+            while (nextArrival < arrivals.size()
+                    && arrivals.get(nextArrival).input.arrivalTime() <= currentTime) {
+                ready.add(arrivals.get(nextArrival++));
+            }
 
-            if (best == null) {
-                int nextArrival = processes.stream()
-                        .filter(process -> process.remainingTime > 0)
-                        .mapToInt(process -> process.input.arrivalTime())
-                        .min()
-                        .orElseThrow();
-                timeline.add(new ExecutionSlice("IDLE", currentTime, nextArrival));
-                currentTime = nextArrival;
+            // Equal remaining time keeps the current process; a new job must
+            // be strictly shorter to cause preemption.
+            if (running != null && !ready.isEmpty()
+                    && ready.peek().remainingTime < running.remainingTime) {
+                ready.add(running);
                 running = null;
-                continue;
             }
-
-            if (previous != null
-                    && previous.remainingTime > 0
-                    && previous.input.arrivalTime() <= currentTime
-                    && previous.remainingTime == best.remainingTime) {
-                running = previous;
-            } else {
-                running = best;
+            if (running == null) {
+                running = ready.remove();
             }
-
             if (running.startTime < 0) {
                 running.startTime = currentTime;
             }
-            int endTime = Math.addExact(currentTime, 1);
+            int duration = running.remainingTime;
+            if (nextArrival < arrivals.size()) {
+                duration = Math.min(duration,
+                        arrivals.get(nextArrival).input.arrivalTime() - currentTime);
+            }
+            int endTime = Math.addExact(currentTime, duration);
             addSlice(timeline, running.input.id(), currentTime, endTime);
-            running.remainingTime--;
+            running.remainingTime -= duration;
             currentTime = endTime;
-
             if (running.remainingTime == 0) {
                 running.completionTime = currentTime;
                 completed++;
@@ -93,25 +99,13 @@ public final class Srtf {
                 return;
             }
         }
+        SchedulingSupport.checkTraceCapacity(timeline.size());
         timeline.add(new ExecutionSlice(processId, startTime, endTime));
     }
 
     private static void validate(List<Process> processes) {
-        if (processes == null || processes.isEmpty()) {
-            throw new IllegalArgumentException("SRTF cần ít nhất một tiến trình.");
-        }
-        Set<String> ids = new HashSet<>();
-        for (Process process : processes) {
-            if (process == null || process.id() == null || process.id().isBlank()) {
-                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
-            }
-            if (!ids.add(process.id().trim())) {
-                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
-            }
-            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
-                throw new IllegalArgumentException("arrivalTime phải >= 0 và burstTime phải > 0.");
-            }
-        }
+        SchedulingSupport.validateWorkload(
+                processes, Process::id, Process::arrivalTime, Process::burstTime, "SRTF");
     }
 
     private static final class SimProcess {

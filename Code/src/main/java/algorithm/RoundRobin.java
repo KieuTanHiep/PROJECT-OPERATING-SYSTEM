@@ -3,9 +3,7 @@ package algorithm;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public final class RoundRobin {
 
@@ -26,6 +24,8 @@ public final class RoundRobin {
         validate(inputs, quantum);
 
         List<SimProcess> processes = inputs.stream()
+                .map(process -> new Process(SchedulingSupport.normalizeProcessId(process.id()),
+                        process.arrivalTime(), process.burstTime()))
                 .sorted(ARRIVAL_ORDER)
                 .map(SimProcess::new)
                 .toList();
@@ -36,6 +36,7 @@ public final class RoundRobin {
         int completed = 0;
 
         while (completed < processes.size()) {
+            SchedulingSupport.checkCancelled();
             while (nextProcess < processes.size()
                     && processes.get(nextProcess).input.arrivalTime() <= currentTime) {
                 readyQueue.addLast(processes.get(nextProcess++));
@@ -43,7 +44,7 @@ public final class RoundRobin {
 
             if (readyQueue.isEmpty()) {
                 int nextArrival = processes.get(nextProcess).input.arrivalTime();
-                addSlice(timeline, "IDLE", currentTime, nextArrival);
+                addSlice(timeline, SchedulingSupport.IDLE_LABEL, currentTime, nextArrival);
                 currentTime = nextArrival;
                 continue;
             }
@@ -54,6 +55,18 @@ public final class RoundRobin {
             }
 
             int duration = Math.min(quantum, running.remainingTime);
+            if (readyQueue.isEmpty()) {
+                if (nextProcess == processes.size()) {
+                    duration = running.remainingTime;
+                } else {
+                    // Skip self-requeues while no other process is ready. An
+                    // arrival still waits until the end of the current quantum.
+                    long untilArrival = (long) processes.get(nextProcess).input.arrivalTime()
+                            - currentTime;
+                    long wholeQuanta = (untilArrival + quantum - 1L) / quantum;
+                    duration = (int) Math.min(running.remainingTime, wholeQuanta * quantum);
+                }
+            }
             int endTime = Math.addExact(currentTime, duration);
             addSlice(timeline, running.input.id(), currentTime, endTime);
             running.remainingTime -= duration;
@@ -89,29 +102,15 @@ public final class RoundRobin {
                 return;
             }
         }
+        SchedulingSupport.checkTraceCapacity(timeline.size());
         timeline.add(new ExecutionSlice(processId, startTime, endTime));
     }
 
     private static void validate(List<Process> processes, int quantum) {
-        if (processes == null || processes.isEmpty()) {
-            throw new IllegalArgumentException("Round Robin cần ít nhất một tiến trình.");
-        }
+        SchedulingSupport.validateWorkload(
+                processes, Process::id, Process::arrivalTime, Process::burstTime, "RoundRobin");
         if (quantum <= 0) {
             throw new IllegalArgumentException("Quantum phải lớn hơn 0.");
-        }
-
-        Set<String> ids = new HashSet<>();
-        for (Process process : processes) {
-            if (process == null || process.id() == null || process.id().isBlank()) {
-                throw new IllegalArgumentException("Mã tiến trình không được để trống.");
-            }
-            if (!ids.add(process.id().trim())) {
-                throw new IllegalArgumentException("Mã tiến trình bị trùng: " + process.id());
-            }
-            if (process.arrivalTime() < 0 || process.burstTime() <= 0) {
-                throw new IllegalArgumentException(
-                        "arrivalTime phải >= 0 và burstTime phải > 0.");
-            }
         }
     }
 
