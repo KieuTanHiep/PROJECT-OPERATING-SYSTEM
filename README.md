@@ -56,10 +56,10 @@ CSV kết quả gồm ba loại dòng: `TRACE` (các đoạn chạy và `IDLE`),
 
 ## Mã nguồn và test
 
-- [SchedulingGUI.java](<./Code/src/main/java/GUI/SchedulingGUI.java>): giao diện desktop.
-- [CpuScheduler.java](<./Code/src/main/java/GUI/CpuScheduler.java>): kiểm tra dữ liệu, điều phối thuật toán và tổng hợp kết quả.
-- `Code/src/main/java/Algorithm/`: 5 thuật toán trong package riêng `Algorithm`.
-- `Code/src/main/java/GUI/CsvScheduleFiles.java`: đọc workload và ghi kết quả CSV.
+- [SchedulingGUI.java](<./Code/src/main/java/gui/SchedulingGUI.java>): giao diện desktop.
+- [CpuScheduler.java](<./Code/src/main/java/gui/CpuScheduler.java>): kiểm tra dữ liệu, điều phối thuật toán và tổng hợp kết quả.
+- `Code/src/main/java/algorithm/`: 5 thuật toán trong package riêng `algorithm`.
+- `Code/src/main/java/gui/CsvScheduleFiles.java`: đọc workload và ghi kết quả CSV.
 - `Code/src/test/java/`: kiểm thử tự động cho thuật toán và CSV; chạy bằng `mvn test`.
 
 ## Tài liệu
@@ -84,8 +84,8 @@ PROJECT-OPERATING-SYSTEM/
 │   ├── output/
 │   ├── src/
 │   │   ├── main/java/
-│   │   │   ├── Algorithm/
-│   │   │   └── GUI/
+│   │   │   ├── algorithm/
+│   │   │   └── gui/
 │   │   └── test/java/
 │   ├── tests/test-plan.csv
 │   └── pom.xml
